@@ -21,9 +21,10 @@ import { autoUpdater } from "electron-updater";
 /* The one module the shell borrows from the server: where `~/.anydag/` is, so the keys, the
    `server.json` readback and the shim live where the server writes them. */
 import { homeDir } from "../server/home";
+import { channelFeed, RELEASES } from "./feed";
 import { forward } from "./forward";
 import { serverHasStarted } from "./launch";
-import { createUpdates, type Updates } from "./updates";
+import { createUpdates, isUpdateChannel, type UpdateChannel, type Updates, versionChannel } from "./updates";
 
 /* -- what the app ships, and where it finds it --------------------------------------------- */
 
@@ -50,8 +51,13 @@ const SIGNED: boolean = typeof __ANYDAG_SIGNED__ === "boolean" ? __ANYDAG_SIGNED
  *  nightly follows nightlies. `allowPrerelease` is what lets the last two see a pre-release; it is
  *  set where the updater runs from the same word, rather than left to electron-updater's identical
  *  default, so the rule is readable there. `autoUpdater.channel` is deliberately never set: its
- *  setter turns on `allowDowngrade`, which a stable user must not get. */
-const UPDATE_CHANNEL: string = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/.exec(VERSION)?.[1] ?? "latest";
+ *  setter turns on `allowDowngrade`, which a stable user must not get.
+ *
+ *  This word is the *default*. A person may choose another channel in Settings → About (#525); the
+ *  choice is this machine's (`update-channel.json` in the app's home) and is handed to the updater
+ *  through `desktop/feed.ts`, still without `autoUpdater.channel`. With no choice made, nothing in
+ *  this paragraph changes (`desktop/updates.ts`, `test/desktop-updates.test.ts`). */
+const UPDATE_CHANNEL: string = versionChannel(VERSION);
 
 /** Where the built page (`dist/`) is. `__dirname` is `desktop/dist` in dev and
  *  `<app.asar>/desktop/dist` packaged, so two levels up is the app's root in both — a real folder
@@ -867,7 +873,25 @@ function fromPage(event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): b
 
 /** Where a release's files and notes are, for a build that cannot install the update itself. */
 const releaseUrl = (version: string): string =>
-  `https://github.com/mouhcineToumi/anydag/releases/tag/v${encodeURIComponent(version)}`;
+  `https://github.com/${RELEASES.owner}/${RELEASES.repo}/releases/tag/v${encodeURIComponent(version)}`;
+
+/** The update channel this machine's person chose (#525): a preference of the app, not of a vault,
+ *  and never synced. Absent — or anything but a channel's word — means none was chosen. */
+const updateChannelFile = path.join(homeDir(), "update-channel.json");
+
+function readUpdateChannel(): UpdateChannel | null {
+  try {
+    const it = JSON.parse(fs.readFileSync(updateChannelFile, "utf8")) as { channel?: unknown } | null;
+    return isUpdateChannel(it?.channel) ? it.channel : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeUpdateChannel(channel: UpdateChannel): void {
+  fs.mkdirSync(path.dirname(updateChannelFile), { recursive: true });
+  fs.writeFileSync(updateChannelFile, JSON.stringify({ channel }, null, 2));
+}
 
 /** Whether this build can put an update in place itself. An unsigned macOS build cannot (see
  *  `SIGNED`), and an AppImage replaces its own file, so it needs the folder it sits in to be
@@ -890,12 +914,16 @@ function canInstallUpdates(): boolean {
 let updates: Updates;
 
 function makeUpdates(): void {
-  autoUpdater.allowPrerelease = UPDATE_CHANNEL !== "latest";
+  const enabled = app.isPackaged && !SMOKE;
   updates = createUpdates({
     updater: autoUpdater,
-    enabled: app.isPackaged && !SMOKE,
+    enabled,
     current: VERSION,
     canInstall: canInstallUpdates(),
+    /* `allowPrerelease` is set from the channel there: the version's own word unless one was chosen. */
+    channel: enabled ? readUpdateChannel() : null,
+    saveChannel: storeUpdateChannel,
+    useFeed: (follow) => autoUpdater.setFeedURL(channelFeed(follow, UPDATE_CHANNEL)),
     releaseUrl,
     openExternal: (url) => void shell.openExternal(url),
     /* The same order a normal quit has: say it is a quit (so the child's exit is not "the server
@@ -933,6 +961,16 @@ async function whenReady(): Promise<void> {
   });
   ipcMain.handle("update:install", async (event) => {
     if (fromPage(event)) await updates.install();
+  });
+  /* The channel, and the one way to a downgrade: the page sends `downgrade` only after the person
+     confirmed that version, and the state machine ignores any other. */
+  ipcMain.handle("update:channel", async (event, channel: unknown) => {
+    if (fromPage(event) && isUpdateChannel(channel)) await updates.setChannel(channel);
+    return updates.state();
+  });
+  ipcMain.handle("update:downgrade", async (event, version: unknown) => {
+    if (fromPage(event) && typeof version === "string") await updates.downgrade(version);
+    return updates.state();
   });
   /* Whether the page's window is in full screen as it loads; the change after is pushed. */
   ipcMain.on("window:full-screen?", (event) => {
@@ -1041,7 +1079,11 @@ async function whenReady(): Promise<void> {
   say(`${VERSION} ready — ${serverPort}`);
 
   /* After the window, so a check's first answer has somewhere to go. */
-  if (updates.state().enabled) say(`updates: channel ${UPDATE_CHANNEL}${canInstallUpdates() ? "" : ", by hand"}`);
+  if (updates.state().enabled) {
+    const followed = updates.state().channel;
+    const chosen = followed === UPDATE_CHANNEL ? "" : ` (chosen; the version's own is ${UPDATE_CHANNEL})`;
+    say(`updates: channel ${followed}${chosen}${canInstallUpdates() ? "" : ", by hand"}`);
+  }
   updates.start();
 }
 

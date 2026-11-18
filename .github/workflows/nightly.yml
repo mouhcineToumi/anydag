@@ -14,14 +14,16 @@
 #      (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`), and only if every one is there.
 #
 # Beside them, every night whether or not there is a build: **secrets**, gitleaks over the whole
-# history of `develop` (`scripts/secrets.sh all`).
+# history of `develop` (`scripts/secrets.sh all`), and **waste**, the whole tree's duplicated blocks
+# and over-complex functions (#526) with their totals and worst entries in the run summary.
 #
 # **Why this publishes itself.** A push made with `GITHUB_TOKEN` starts no other workflow, so the tag
 # below does not start `release.yml` — which would refuse it anyway, because a nightly is not a release.
 #
 # **Who gets it.** The update channel is the version's own word (`nightly`): a build installed from
 # one asks for `nightly*.yml` and follows nightlies, and a stable or beta build never sees a nightly,
-# because a pre-release is not GitHub's "latest" and a beta only follows `beta`. `desktop/main.ts` says how.
+# because a pre-release is not GitHub's "latest" and a beta only follows `beta` — unless its person
+# chose *Nightly* in Settings → About (#525). `desktop/main.ts` says how.
 #
 # `e2e.yml` runs at this workflow's own commit, `develop`'s head — the stamped commit's parent, and the
 # same code but for three version lines.
@@ -131,6 +133,28 @@ jobs:
       - uses: ./.github/actions/gitleaks
       - run: bash scripts/secrets.sh selftest
       - run: bash scripts/secrets.sh all
+
+  # The two wastes of agent-written code, over the whole tree (#526): duplicated blocks (jscpd) and
+  # functions over the cognitive-complexity threshold, each with its totals and worst entries in the
+  # run summary. Like `secrets`, it runs every night whether or not there is a build, and it holds
+  # nothing back — the follow-up issues come from its list, and the numbers can only go down.
+  waste:
+    name: duplication and complexity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run report:duplication
+      - run: npm run report:complexity
 
   checks:
     name: checks

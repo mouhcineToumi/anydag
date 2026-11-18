@@ -9,9 +9,13 @@
  * - **Every check here is a refusal, never a repair.** A field of the wrong type is
  *   `ES_BAD_REQUEST`, not coerced: a client that sends a string `parent` has a bug the server must
  *   not paper over, or two devices would disagree about what a commit meant.
+ * - **A body is read through its schema in `protocol/schema.ts`** (`read`, or `body` then `parse`
+ *   where a route looks something up between the two), the one the OpenAPI document is generated
+ *   from, so the document and the handler cannot disagree about what a route accepts.
  */
 
 import type { Context } from "hono";
+import type { z } from "zod";
 
 import type { ErrorCode } from "../../protocol/wire";
 import type { Blobs } from "../blobs/types";
@@ -66,16 +70,35 @@ export async function body(c: Context): Promise<Record<string, unknown>> {
   return v;
 }
 
-export function str(v: unknown, what: string, max = 4096, min = 1): string {
-  if (typeof v !== "string" || v.length < min || v.length > max)
-    throw new HttpError("ES_BAD_REQUEST", `${what} must be a string of ${min} to ${max} characters`);
-  return v;
+/**
+ * `value` through `schema`, or `ES_BAD_REQUEST` with the first fault's sentence. First is the order
+ * the fields are declared in, which is the order a route checked them in by hand — but a fault of a
+ * list's element comes before any fault of a later element, and an element's own fault (a key
+ * changed twice in one commit) before its fields', because zod says a refinement after everything
+ * it found itself.
+ */
+export function parse<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
+  const r = schema.safeParse(value);
+  if (r.success) return r.data;
+  let first = r.error.issues[0]!;
+  for (const issue of r.error.issues.slice(1)) if (before(issue.path, first.path)) first = issue;
+  throw new HttpError("ES_BAD_REQUEST", first.message);
 }
 
-export function count(v: unknown, what: string): number {
-  if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 0)
-    throw new HttpError("ES_BAD_REQUEST", `${what} must be a whole number of at least 0`);
-  return v;
+/** Whether a fault at `a` comes strictly before one at `b`: an earlier list element, or `b`'s container. */
+function before(a: readonly PropertyKey[], b: readonly PropertyKey[]): boolean {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x === y) continue;
+    return typeof x === "number" && typeof y === "number" && x < y;
+  }
+  return a.length < b.length;
+}
+
+/** The JSON body through its schema: `body`, then `parse`. */
+export async function read<S extends z.ZodType>(c: Context, schema: S): Promise<z.output<S>> {
+  return parse(schema, await body(c));
 }
 
 /** A query parameter as a whole number, or `fallback` when absent. */

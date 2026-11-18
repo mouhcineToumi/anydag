@@ -48,11 +48,11 @@ export const PAGES = [
 ] as const;
 
 /** What is running the page. */
-const SHELLS = ["desktop", "browser"] as const;
+export const SHELLS = ["desktop", "browser"] as const;
 
-const OSES = ["linux", "darwin", "win32", "other"] as const;
+export const OSES = ["linux", "darwin", "win32", "other"] as const;
 
-const ARCHES = ["x64", "arm64", "other"] as const;
+export const ARCHES = ["x64", "arm64", "other"] as const;
 
 /** The fourteen diagram types — held to `DIAGRAM_TYPES` by `test/logs.test.ts`. */
 export const DIAGRAM_KINDS = [
@@ -156,10 +156,10 @@ export interface LogsAccepted {
   accepted: number;
 }
 
-const ROUTE = /^(GET|POST|PUT|DELETE|PATCH) \/[A-Za-z0-9_/:.*-]{0,100}$/;
-const VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
-const LOCALE = /^[a-z]{2,3}(-[A-Z]{2})?$/;
-const INSTALL = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const ROUTE = /^(GET|POST|PUT|DELETE|PATCH) \/[A-Za-z0-9_/:.*-]{0,100}$/;
+export const VERSION = /^[0-9A-Za-z.+-]{1,32}$/;
+export const LOCALE = /^[a-z]{2,3}(-[A-Z]{2})?$/;
+export const INSTALL = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const SCRIPT = /([A-Za-z0-9_.-]+\.(?:m?js|cjs|tsx?))((?::\d+){0,2})(?:[?#][^\s]*)?$/;
 const FILE_EXT = "md|png|jpe?g|gif|svg|webp|pdf|csv|tsv|json|txt|docx?|xlsx?|pptx?|zip|mp[34]|mov|wav|html?";

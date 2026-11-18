@@ -50,8 +50,13 @@ the app's home).
   pinned Playwright Docker image, screenshots compared. `npm run e2e:local` is the host browser and
   compares none (see *Gate* below).
 - `npm run parity` — redraw `docs/PARITY.md` after touching `docs/parity.json`.
+- `npm run openapi` — regenerate `docs/api/*.openapi.json` and their references after changing a route
+  of the api server (`check:openapi` fails until you do; *The OpenAPI document* in `api.md`).
 - `node scripts/snapshot.mjs <board>` — render a board and print its diagnostics.
 - `node scripts/bench.mjs [--quick]` — measure memory, CPU and timings on synthetic vaults (`docs/architecture/limits.md`).
+- `node scripts/release-report.mjs <version>` — write and print a stable release's development health report (`docs/metrics/README.md`).
+- `node scripts/visual-review.mjs <pr>` / `--all` — the local, agent-driven visual review of a pull request's chrome, or
+  of the whole app; driven by the `visual-review` skill, never in CI (*The visual review* in `gate-and-releases.md`).
 
 ## The layers, and what each may not know
 
@@ -80,7 +85,7 @@ the app's home).
 | `cli/` | `anydag`: arguments, finding the server, commands as op lists | the disk: every read and write is a route |
 | `server/` | the local server: token and `Host` gate, vault store, home and SQLite index, routes, MCP tools, `chat/`, `sync/` | React, the DOM |
 | `desktop/` | the Electron shell: server child, `anydag://`, windows, dialogs, updates | the vault's format |
-| `api/` | the api server: the self-hostable sync server and the wire/crypto protocol shared with the client, plus logs and the feedback relay | a path, a byte of plaintext |
+| `api/` | the api server: the self-hostable sync server and the wire/crypto protocol shared with the client, plus logs and the feedback relay; `api/openapi/`, the OpenAPI builder every spec shares | a path, a byte of plaintext |
 
 
 `src/edit/` splits along one line: **the gesture is in `useEditor.ts`, the meaning is in a file with
@@ -163,12 +168,13 @@ One line each; the full account with the defect that found it is in
 | the `anydag` CLI, the MCP server, `docs/parity.json` | [`cli.md`](docs/architecture/cli.md) |
 | the local server, vaults, the token gate | [`server.md`](docs/architecture/server.md) |
 | the Electron shell, packaging, signing | [`desktop.md`](docs/architecture/desktop.md) |
-| the api server, its features, config and deployment | [`api.md`](docs/architecture/api.md), [`sync.md`](docs/architecture/sync.md) (the client half) |
+| the api server, its features, config and deployment, its OpenAPI document | [`api.md`](docs/architecture/api.md), [`sync.md`](docs/architecture/sync.md) (the client half) |
 | sync (client) | [`sync.md`](docs/architecture/sync.md) |
 | the Assistant (chat) | [`assistant.md`](docs/architecture/assistant.md) |
 | anonymous logs | [`logs.md`](docs/architecture/logs.md) |
 | Send feedback, the feedback relay | [`feedback.md`](docs/architecture/feedback.md) |
 | the gate, CI, releases | [`gate-and-releases.md`](docs/architecture/gate-and-releases.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), `docs/RELEASING.md` |
+| the development health report per release | [`docs/metrics/README.md`](docs/metrics/README.md), `scripts/release-report.mjs` |
 | resource use, limits, `scripts/bench.mjs` and its nightly guards | [`limits.md`](docs/architecture/limits.md) |
 
 Section names in italics inside those files (*Picking a node*, *The time zone*) are listed with their
@@ -181,8 +187,8 @@ card's system prompt), `docs/parity.json` and `docs/PARITY.md`, `skills/anydag/`
 
 The pre-commit hook first runs `scripts/secrets.sh` (gitleaks over the staged change; CI's `secrets`
 job and the nightly run it too). `npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
-`check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `check:design`, `test/parity.test.ts`,
-vitest). It needs no browser and is the pre-commit hook. Pre-push runs `npm run lint:promises` and the
+`check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `check:design`, `check:openapi`,
+`check:duplication`, `check:complexity`, `test/parity.test.ts`, vitest). It needs no browser and is the pre-commit hook. Pre-push runs `npm run lint:promises` and the
 store's contracts over a watched vault (about 30 s, the two checks only CI used to run). The
 Playwright suite is the slow tier and runs in the pinned Docker image, locally (`npm run e2e:docker`)
 and in CI (`e2e.yml`: on a pull request the `@smoke` tier plus the specs the change reaches, everything on
