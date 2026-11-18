@@ -31,13 +31,14 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { RELEASE_ROWS } from "./bench-release.mjs";
 import { compareVersions, median, METRICS, rate, reportsUpTo, summarize, WEEK_MS } from "./lib/release-report.mjs";
 import { parseVersion } from "./lib/version.mjs";
 
-const ROOT = path.resolve(import.meta.dirname, "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const METRICS_DIR = path.join(ROOT, "docs", "metrics");
 const BENCH_DIR = path.join(ROOT, "docs", "bench");
 const DAY_MS = 24 * 60 * 60 * 1000;
