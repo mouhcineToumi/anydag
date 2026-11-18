@@ -333,7 +333,7 @@
  * between rows — what the setting is and does on the left, its control on the right. The controls
  * share one right edge because each is given a width rather than sizing to its longest option.
  */
-.dag-settings__group + .dag-settings__group { margin-top: 28px; }
+.dag-settings__group + .dag-settings__group { margin-top: 6px; }
 .dag-settings__section { margin: 0 0 8px; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
 .dag-settings__card {
   background: var(--dag-color-card);
