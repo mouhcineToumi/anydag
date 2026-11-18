@@ -2233,6 +2233,13 @@ async function guard(b) {
 
 /* -- the run -------------------------------------------------------------------------------------- */
 
+/** `--json`: every measurement so far, with the machine. */
+function writeJson(machine, started) {
+  if (!JSON_OUT) return;
+  fs.writeFileSync(JSON_OUT, `${JSON.stringify({ machine, started, args: argv, results }, null, 2)}\n`);
+  console.log(`# wrote ${JSON_OUT}`);
+}
+
 async function main() {
   const m = machine();
   const started = new Date().toISOString();
@@ -2270,10 +2277,7 @@ async function main() {
     if (b) await b.stop();
     /* Written whether or not every group finished: a long run that stops at its last step keeps
        what it measured before it (the nightly keeps this file). */
-    if (JSON_OUT) {
-      fs.writeFileSync(JSON_OUT, `${JSON.stringify({ machine: m, started, args: argv, results }, null, 2)}\n`);
-      console.log(`# wrote ${JSON_OUT}`);
-    }
+    writeJson(m, started);
   }
   if (RELEASE) {
     const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();

@@ -117,6 +117,52 @@ export function markdown(verdicts, { base, head, rounds: n, what, machine, ratio
 
 /* -- the run ------------------------------------------------------------------------------------- */
 
+/** A checkout the bench can measure: its server bundle and its page are built. */
+function built(dir) {
+  return (
+    fs.existsSync(path.join(dir, "server", "dist", "anydag-server.mjs")) && fs.existsSync(path.join(dir, "dist", "index.html"))
+  );
+}
+
+/**
+ * `n` rounds of the head's bench on each build, alternating which goes first, so a machine that
+ * warms or tires through the job weighs on both sides alike. `null` when a run fails (said on stderr).
+ */
+function measure(dirs, n, args) {
+  /* Each run's JSON goes in a temp folder of this script's own, removed by that exact path. */
+  const tmp = fs.realpathSync(os.tmpdir());
+  const work = fs.mkdtempSync(path.join(tmp, "anydag-compare-"));
+  const runs = { base: [], head: [] };
+  let machine = null;
+  try {
+    for (let i = 0; i < n; i++) {
+      for (const side of i % 2 === 0 ? ["base", "head"] : ["head", "base"]) {
+        const json = runOnce(side, dirs[side], path.join(work, `${side}-${i}.json`), args, `round ${i + 1} of ${n}`);
+        if (!json) return null;
+        machine ??= json.machine;
+        runs[side].push(json);
+      }
+    }
+  } finally {
+    if (path.dirname(work) === tmp && path.basename(work).startsWith("anydag-compare-"))
+      fs.rmSync(work, { recursive: true, force: true });
+  }
+  return { runs, machine };
+}
+
+/** One bench run on one build; its JSON, or `null` when it failed. */
+function runOnce(side, dir, out, args, round) {
+  console.log(`# ${round}: ${side} (${dir})`);
+  const r = spawnSync(process.execPath, [path.join(here, "bench.mjs"), "--app", dir, ...args, "--json", out], {
+    stdio: "inherit",
+  });
+  if (r.status !== 0 || !fs.existsSync(out)) {
+    console.error(`bench-compare: the ${side} run of ${round} failed (exit ${r.status})`);
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(out, "utf8"));
+}
+
 function main(argv) {
   const opt = (name, dflt) => {
     const at = argv.indexOf(name);
@@ -133,48 +179,19 @@ function main(argv) {
   const sizes = opt("--sizes", "1000");
   const ratio = Number(opt("--ratio", String(DEFAULTS.ratio)));
   const floor = Number(opt("--floor", String(DEFAULTS.floor)));
-  for (const [side, dir] of [
+  const unbuilt = [
     ["base", base],
     ["head", head],
-  ])
-    if (
-      !fs.existsSync(path.join(dir, "server", "dist", "anydag-server.mjs")) ||
-      !fs.existsSync(path.join(dir, "dist", "index.html"))
-    ) {
-      console.error(`bench-compare: the ${side} at ${dir} is not built — run \`npx vite build && node server/build.mjs\` in it`);
-      return 2;
-    }
-
-  /* Each run's JSON goes in a temp folder of this script's own, removed by that exact path. */
-  const tmp = fs.realpathSync(os.tmpdir());
-  const work = fs.mkdtempSync(path.join(tmp, "anydag-compare-"));
-  const runs = { base: [], head: [] };
-  let machine = null;
-  try {
-    for (let i = 0; i < n; i++) {
-      const order = i % 2 === 0 ? ["base", "head"] : ["head", "base"];
-      for (const side of order) {
-        const dir = side === "base" ? base : head;
-        const out = path.join(work, `${side}-${i}.json`);
-        console.log(`# round ${i + 1} of ${n}: ${side} (${dir})`);
-        const r = spawnSync(
-          process.execPath,
-          [path.join(here, "bench.mjs"), "--app", dir, "--only", only, "--sizes", sizes, "--json", out],
-          { stdio: "inherit" },
-        );
-        if (r.status !== 0 || !fs.existsSync(out)) {
-          console.error(`bench-compare: the ${side} run of round ${i + 1} failed (exit ${r.status})`);
-          return 2;
-        }
-        const json = JSON.parse(fs.readFileSync(out, "utf8"));
-        machine ??= json.machine;
-        runs[side].push(json);
-      }
-    }
-  } finally {
-    if (path.dirname(work) === tmp && path.basename(work).startsWith("anydag-compare-"))
-      fs.rmSync(work, { recursive: true, force: true });
+  ].find(([, dir]) => !built(dir));
+  if (unbuilt) {
+    console.error(
+      `bench-compare: the ${unbuilt[0]} at ${unbuilt[1]} is not built — run \`npx vite build && node server/build.mjs\` in it`,
+    );
+    return 2;
   }
+  const measured = measure({ base, head }, n, ["--only", only, "--sizes", sizes]);
+  if (!measured) return 2;
+  const { runs, machine } = measured;
 
   const verdicts = compare(rowsOf(runs.base, runs.head), { ratio, floor });
   const label = (dir, name) => {
