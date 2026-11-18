@@ -12,7 +12,7 @@
  *     node scripts/e2e-plan.mjs --head <sha> --head <sha> --field run   # `--head` may repeat; one field
  *     node scripts/e2e-plan.mjs --files a.ts,b.md                       # classify a list, no git
  *
- * **The rule.** Every changed path is one of five kinds, and a specs run is the union of what the
+ * **The rule.** Every changed path is one of six kinds, and a specs run is the union of what the
  * kinds ask for:
  *
  *   ignore   prose, CI config, unit tests, the desktop shell, scripts that only check things — the
@@ -20,9 +20,12 @@
  *   app      anything else (`src/`, `server/`, `plugins/`, `cli/`, `vite.config.ts`, …, and any path
  *            this list has not heard of — the safe side): the `@smoke` tier, which touches every
  *            surface
- *   pixels   what changes how a board is drawn (`boards/`, `icons/`, `public/`, and the drawing
- *            layers of `src/`): also `reference.spec.ts`, the 45 screenshots, because the smoke tier
- *            holds only ten of them
+ *   pixels   what changes how a board is drawn (`boards/`, `icons/`, `public/`, `themes/`, and the
+ *            drawing layers of `src/`): also `reference.spec.ts`, the 45 screenshots, because the
+ *            smoke tier holds only ten of them, and `surfaces.spec.ts`, since a theme or a stylesheet
+ *            moves the chrome's pixels too
+ *   chrome   the app around the diagram (`src/ui/`, `src/settings/`): the smoke tier and
+ *            `surfaces.spec.ts`, every top-level surface in light and dark (#528)
  *   sync     the sync server (api/) and its client: also `sync.spec.ts`
  *   harness  the way the suite is run (`playwright.config.ts`, the lockfile, `scripts/e2e-*`): the
  *            smoke tier, to prove the suite still runs
@@ -45,8 +48,9 @@ const RULES = [
   [/^(playwright\.config\.ts|package(-lock)?\.json|scripts\/e2e-[^/]+|\.github\/workflows\/e2e\.yml)$/, "harness"],
   [/^(api\/|server\/sync\/)/, "sync"],
   [/^boards\//, "pixels"],
-  [/^(icons\/|public\/|index\.html$)/, "pixels"],
+  [/^(icons\/|public\/|themes\/|index\.html$)/, "pixels"],
   [/^src\/(render|layout|theme|styles|dsl|quality|view|board)\//, "pixels"],
+  [/^src\/(ui|settings)\//, "chrome"],
   /* Prose. Under `boards/` a `.md` is a fixture the suite draws, and was caught above. */
   [/\.md$/, "ignore"],
   [/^(docs|\.github|\.githooks|\.claude|test|skills|desktop)\//, "ignore"],
@@ -70,9 +74,10 @@ export function plan(files, tracedSpecs = () => []) {
   for (const f of files) kinds.set(kindOf(f), [...(kinds.get(kindOf(f)) ?? []), f]);
   const has = (k) => kinds.has(k);
 
-  const smoke = has("app") || has("pixels") || has("sync") || has("harness");
+  const smoke = has("app") || has("pixels") || has("chrome") || has("sync") || has("harness");
   const specs = new Set();
   if (has("pixels")) specs.add("reference.spec.ts");
+  if (has("pixels") || has("chrome")) specs.add("surfaces.spec.ts");
   if (has("sync")) specs.add("sync.spec.ts");
   for (const f of kinds.get("snapshot") ?? []) {
     const m = /^e2e\/([^/]+\.spec\.ts)-snapshots\//.exec(f);
