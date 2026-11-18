@@ -51,7 +51,8 @@ the app's home).
   compares none (see *Gate* below).
 - `npm run parity` — redraw `docs/PARITY.md` after touching `docs/parity.json`.
 - `npm run openapi` — regenerate `docs/api/*.openapi.json` and their references after changing a route
-  of the api server (`check:openapi` fails until you do; *The OpenAPI document* in `api.md`).
+  of the api server or the local server (`check:openapi` fails until you do; *The OpenAPI document* in
+  `api.md`, *The local OpenAPI document* in `server.md`).
 - `node scripts/snapshot.mjs <board>` — render a board and print its diagnostics.
 - `node scripts/bench.mjs [--quick]` — measure memory, CPU and timings on synthetic vaults (`docs/architecture/limits.md`).
 - `node scripts/release-report.mjs <version>` — write and print a stable release's development health report (`docs/metrics/README.md`).
@@ -143,7 +144,8 @@ One line each; the full account with the defect that found it is in
   `npm run e2e:docker -- --update-snapshots=all`, read a sample, and commit the images on their own.
 - **Measure flakes at no more workers than the machine has cores.**
 - **The unit suite shares modules between files** (`isolate: false`): put back any global you stub.
-- **A new route, command or MCP tool is a line in `docs/parity.json` in the same commit.**
+- **A new route, command or MCP tool is a line in `docs/parity.json` in the same commit**; a new local
+  route is also a row in `server/schema/`, its body read through `bodyAs` (*The local OpenAPI document*).
 - **`check:skill` holds `skills/anydag/SKILL.md` to the code**; in its *Through MCP* section any
   backticked word with an underscore is read as a tool name.
 

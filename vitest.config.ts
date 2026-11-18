@@ -21,6 +21,8 @@ export default defineConfig({
   },
   test: {
     include: ["test/**/*.test.ts", "api/**/*.test.ts"],
+    /* Every answer of the local server held to its OpenAPI document (`test/server/spec.ts`). */
+    setupFiles: ["test/server/answers.setup.ts"],
     environment: "node",
     /*
      * **Modules are shared between the files a worker runs, and up to four workers run them.**

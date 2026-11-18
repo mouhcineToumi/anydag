@@ -151,8 +151,9 @@ test("a quiz written as a file is a card on the Quizzes page, and its questions 
   /* Drawn as what it says — the backticks are code, never characters on the screen. */
   await expect(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-prompt]')).toHaveText("What does VACUUM reclaim?");
   await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-option-text]').first()).toHaveText("xmin");
-  await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-kind-select]')).toHaveValue("several");
-  await expect(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-kind-select]')).toHaveValue("one");
+  await expect(page.locator('[data-dag-quiz-question="qvis"]')).toHaveAttribute("data-dag-quiz-kind", "several");
+  await expect(page.locator('[data-dag-quiz-question="qvac"]')).toHaveAttribute("data-dag-quiz-kind", "one");
+  await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-kind-button]')).toHaveText("Several right answers");
   /* No source anywhere on the page. */
   await expect(page.locator("textarea")).toHaveCount(0);
   /* Opening it wrote nothing: the question with no id keeps having none until something writes. */
@@ -163,6 +164,12 @@ test("a quiz written as a file is a card on the Quizzes page, and its questions 
 async function open(field: Locator): Promise<void> {
   await field.click();
   await expect(field.locator('[contenteditable="true"]')).toBeFocused();
+}
+
+/** Change a question's kind through the menu on its kind label. */
+async function setKind(card: Locator, kind: "one" | "several" | "written" | "card"): Promise<void> {
+  await card.locator("[data-dag-quiz-kind-button]").click();
+  await card.locator(`[data-dag-quiz-kind-option="${kind}"]`).click();
 }
 
 test("an edit in the form rewrites the question it touched and leaves every other byte", async ({ page }) => {
@@ -192,6 +199,7 @@ test("a question built in the form is written as the file's Markdown, none of it
   const name = write("pg");
   await page.goto(`/?quiz=${name}`);
   await page.locator("[data-dag-quiz-add]").click();
+  await page.locator('[data-dag-quiz-add-kind="one"]').click();
   const added = page.locator("[data-dag-quiz-question]").last();
   /* The new card takes the caret, so a person can type straight into it. */
   await expect(added.locator('[data-dag-quiz-prompt] [contenteditable="true"]')).toBeFocused();
@@ -208,7 +216,7 @@ test("a question built in the form is written as the file's Markdown, none of it
   await added.locator("[data-dag-quiz-correct-toggle]").nth(1).check();
   await expect.poll(() => read("pg")).toMatch(/- \[ \] Snapshots\n- \[x\] Row versions\n$/);
   /* Several: both can be ticked, and the ticks say it, so the heading needs no `multi`. */
-  await added.locator("[data-dag-quiz-kind-select]").selectOption("several");
+  await setKind(added, "several");
   await added.locator("[data-dag-quiz-correct-toggle]").nth(0).check();
   await expect
     .poll(() => read("pg"))
@@ -252,7 +260,7 @@ test("a question becomes answered in words, after asking, and back", async ({ pa
   const name = write("pg");
   await page.goto(`/?quiz=${name}`);
   const card = page.locator('[data-dag-quiz-question="qvac"]');
-  await card.locator("[data-dag-quiz-kind-select]").selectOption("written");
+  await setKind(card, "written");
   /* It has answers with words in them: asked first, and nothing written until it is answered. */
   await expect(card.locator("[data-dag-quiz-drop-answers]")).toBeVisible();
   expect(read("pg")).toBe(QUIZ);
@@ -262,7 +270,7 @@ test("a question becomes answered in words, after asking, and back", async ({ pa
     .toMatch(/## What does VACUUM reclaim\? \{#qvac\}\n\n> Dead tuples stay until VACUUM\n> marks their space reusable\.\n/);
   await expect(card.locator("[data-dag-quiz-option-text]")).toHaveCount(0);
   await expect(card.locator("[data-dag-quiz-why]")).toHaveAttribute("data-dag-quiz-why", "");
-  await card.locator("[data-dag-quiz-kind-select]").selectOption("one");
+  await setKind(card, "one");
   await expect.poll(() => read("pg")).toMatch(/## What does VACUUM reclaim\? \{#qvac\}\n\n- \[x\]\n- \[ \]\n\n> Dead tuples/);
 });
 
@@ -536,5 +544,5 @@ test("the sidebar's New quiz makes one and opens it, and Quizzes opens the Quizz
   const box = page.locator("[data-dag-toolbar-name]");
   await expect(box).toHaveValue("Untitled");
   await box.press("Escape");
-  await expect(page.locator("[data-dag-quiz-add]")).toContainText("Add the first question");
+  await expect(page.locator("[data-dag-quiz-first]")).toContainText("Add the first question");
 });

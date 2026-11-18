@@ -524,8 +524,8 @@ export async function devices(links: SyncLinks, vault: Vault): Promise<SyncDevic
   }
 }
 
-export async function revoke(links: SyncLinks, vault: Vault, id: unknown): Promise<SyncDevices> {
-  if (typeof id !== "string" || !id) throw err(400, "Name the device to sign out by its `id`.");
+/** `id` was read by the route (`RevokeBody` in `server/schema/cloud.ts`). */
+export async function revoke(links: SyncLinks, vault: Vault, id: string): Promise<SyncDevices> {
   const { api, pairing } = links.api(vault.id);
   try {
     const before = devicesOf(await api.devices(), pairing.device.id);

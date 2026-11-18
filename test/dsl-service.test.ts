@@ -294,9 +294,10 @@ describe("patch", () => {
   });
 
   it("refuses a list that is not one in the words the route uses for it", async () => {
-    /* The route refuses an `ops` that is not a list before it calls here; a caller is told one thing. */
+    /* The route refuses an `ops` that is not a list before it calls here — its body's schema reads
+       `ops` (`PatchBody`, #531); a caller is told one thing. */
     const r = await post("/patch", { text: BOARD, ops: "nope" });
-    const route = fs.readFileSync(path.resolve(__dirname, "../server/routes/docs.ts"), "utf8");
+    const route = fs.readFileSync(path.resolve(__dirname, "../server/schema/docs.ts"), "utf8");
     expect(route).toContain("throw err(400, OPS_SHAPE)");
     expect((r.body as { error: string }).error).toBe(OPS_SHAPE);
   });
