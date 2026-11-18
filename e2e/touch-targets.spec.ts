@@ -251,9 +251,16 @@ test("at 1440 × 900 Tasks, the calendar, a quiz and a table are at least 24 × 
 
   await page.goto(`/?quiz=${encodeURIComponent(`${stem}/quiz`)}`);
   await expect(page.locator("[data-dag-quiz-question]")).toBeVisible({ timeout: 15_000 });
+  /* The questions are folded to one line each (#257): the list is measured, then the open card. */
+  await expect(page.locator("[data-dag-quiz-row]").first()).toBeVisible();
+  await measure(page, "a quiz's folded list at 1440", [".dag-app--quiz"], 24);
+  await page.locator("[data-dag-quiz-row]").first().click();
   await expect(page.locator("[data-dag-quiz-correct-toggle]").first()).toBeVisible();
   await measure(page, "a quiz at 1440", [".dag-app--quiz"], 24);
-  /* Delete asks on the card before it does anything. */
+  /* Delete is in the open card's ⋯, and asks on the card before it does anything. */
+  await page.locator("[data-dag-quiz-card-more]").click();
+  await expect(page.locator("[data-dag-quiz-card-menu]")).toBeVisible();
+  await measure(page, "a quiz card's ⋯ at 1440", [".dag-app--quiz"], 24);
   await page.locator("[data-dag-quiz-delete]").click();
   await expect(page.locator("[data-dag-quiz-confirm]")).toBeVisible();
   await measure(page, "a quiz's delete question at 1440", [".dag-app--quiz"], 24);
