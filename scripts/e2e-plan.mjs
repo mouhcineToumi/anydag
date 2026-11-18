@@ -50,7 +50,10 @@ const RULES = [
   /* Prose. Under `boards/` a `.md` is a fixture the suite draws, and was caught above. */
   [/\.md$/, "ignore"],
   [/^(docs|\.github|\.githooks|\.claude|test|skills|desktop)\//, "ignore"],
-  [/^scripts\/(check-[^/]+|checks\.sh|gate\.sh|hooks\.mjs|parity\.mjs|stamp\.mjs|icons\/.*|api-demo\.sh)$/, "ignore"],
+  [
+    /^scripts\/(check-[^/]+|checks\.sh|gate\.sh|hooks\.mjs|parity\.mjs|openapi\.mjs|stamp\.mjs|icons\/.*|api-demo\.sh)$/,
+    "ignore",
+  ],
   [/^(LICENSE[^/]*|CODEOWNERS|\.gitignore|\.gitattributes|\.editorconfig|biome\.jsonc?|renovate\.json|VERSION)$/, "ignore"],
 ];
 

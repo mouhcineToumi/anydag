@@ -7,6 +7,8 @@
  * - **Nothing is stubbed**: the routes are tested through the same `Meta` adapter the server ships,
  *   so a stub cannot agree with a route about a shape the database never returns (the rule
  *   docs/architecture/things-that-will-bite.md states about the hosted api's stubs).
+ * - **Every answer is held to the OpenAPI document** (`spec.ts`) as the harness hands it back, so
+ *   each suite's recorded answers are the document's test too.
  * - **The Postgres backend is skipped with a word when no server is named**, and when one is, every
  *   run gets a fresh schema (`search_path` through `pgDb`'s `schema`), dropped at the end, so runs
  *   never see each other's rows.
@@ -26,6 +28,7 @@ import { PgMeta } from "../server/meta/pg";
 import type { Db } from "../server/meta/types";
 import { mintPairCode } from "../server/routes/pair";
 import { PokeHub } from "../server/routes/poke";
+import { answerProblem } from "./spec";
 
 export const ADMIN = "admin-token-for-the-tests-0123456789";
 export const PG_URL = process.env.ANYDAG_API_TEST_PG ?? "";
@@ -110,6 +113,19 @@ export async function harness(
   };
   const hub = new PokeHub();
   const app = createApp({ meta, blobs, config, now: () => clock.now, hub, version: "test", pingMs: 50, ...opts });
+  /* Every answer a test records is held to the OpenAPI document as it arrives (`spec.ts`): a status
+     the document does not list, or a body its schema refuses, fails the test that met it. */
+  const request = app.request;
+  const features = { sync: config.sync, logs: config.logs, feedback: config.feedback };
+  app.request = async (input, init, ...rest) => {
+    const res = await request(input, init, ...rest);
+    const req = input instanceof Request ? input : null;
+    const method = init?.method ?? req?.method ?? "GET";
+    const url = req ? req.url : String(input);
+    const problem = await answerProblem(features, method, new URL(url, "http://localhost").pathname, res);
+    if (problem) throw new Error(`the answer is not the one the OpenAPI document gives: ${problem}`);
+    return res;
+  };
   return {
     app,
     meta,

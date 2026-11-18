@@ -1,0 +1,4448 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AnyDag sync API",
+    "version": "2",
+    "description": "`anydag-api`: end-to-end-encrypted sync, opt-in anonymous logs and the feedback relay, one Node process anybody can run (`api/` in the AnyDag repository).\n\nThe server holds opaque keys, sealed blobs and sealed metadata, and never a path or a byte of a file: a `key` is an HMAC of a path, a blob id an HMAC of the bytes, a `meta` and a vault's `name` are sealed, all base64url.\n\n`info.version` is the sync protocol, 2. Every request to a route that lists the `anydag-sync-protocol` header must send it, and every `/v1` answer says it back. A refusal is `{code, message}` at the status its `ES_*` code has, whatever the route; branch on the code.\n\nGenerated from the code (`api/server/openapi.ts`, `api/protocol/schema.ts`): do not edit it by hand."
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "tags": [
+    {
+      "name": "service",
+      "description": "What runs, and whether it is up. No token."
+    },
+    {
+      "name": "devices",
+      "description": "Pairing a device, and the account's devices."
+    },
+    {
+      "name": "vaults",
+      "description": "A device's account, its vaults and their keys."
+    },
+    {
+      "name": "blobs",
+      "description": "Sealed bytes in, sealed bytes out."
+    },
+    {
+      "name": "log",
+      "description": "Each vault's gapless log of commits, and its heads."
+    },
+    {
+      "name": "logs",
+      "description": "Anonymous logs from installs that said yes. No token."
+    },
+    {
+      "name": "feedback",
+      "description": "The feedback relay. No token."
+    },
+    {
+      "name": "admin",
+      "description": "The operator's routes, behind `ANYDAG_API_ADMIN_TOKEN`."
+    }
+  ],
+  "paths": {
+    "/v1": {
+      "get": {
+        "operationId": "info",
+        "summary": "What this server runs",
+        "description": "How the app tells what a server runs without trying each feature.",
+        "tags": [
+          "service"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The server's name, version and features.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Info"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The server failed; the stack is on its stderr, never here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Liveness, and the protocol this server speaks",
+        "tags": [
+          "service"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The process is up.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/ready": {
+      "get": {
+        "operationId": "ready",
+        "summary": "Whether the database answers",
+        "description": "The check a proxy and a compose healthcheck watch. A failing database is logged on stderr, never in the answer.",
+        "tags": [
+          "service"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The database answered.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ready"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          },
+          "503": {
+            "description": "The database did not answer.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ready"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/openapi.json": {
+      "get": {
+        "operationId": "openapi",
+        "summary": "This document",
+        "description": "The routes of a feature this server has switched off are not in it.",
+        "tags": [
+          "service"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The OpenAPI 3.1 document of this server.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenApiDocument"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/pair": {
+      "post": {
+        "operationId": "pair",
+        "summary": "Pair a device with a one-time code",
+        "description": "The code is the credential: ten Crockford base32 characters, used once, dead after fifteen minutes. A bad, used and expired code are one answer. The device limit is checked after the code is taken, so a refused pairing spends it.",
+        "tags": [
+          "devices"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The device token, shown once.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST_or_ES_PAIR"
+          },
+          "413": {
+            "$ref": "#/components/responses/ES_QUOTA"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/devices": {
+      "get": {
+        "operationId": "devices",
+        "summary": "The account's devices",
+        "tags": [
+          "devices"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every device of the account, the one asking marked `current`.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}": {
+      "delete": {
+        "operationId": "revokeDevice",
+        "summary": "Revoke a device",
+        "description": "Its next request is refused `ES_AUTH` — the asking device's own included.",
+        "tags": [
+          "devices"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The device's id.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/vaults": {
+      "get": {
+        "operationId": "vaults",
+        "summary": "The account's vaults",
+        "tags": [
+          "vaults"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every vault of the account; their names are sealed.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createVault",
+        "summary": "Make a vault",
+        "description": "The id is the server's; a proposed one is kept when it is free. A failed upload is taken up again: an unkeyed, empty vault of the same account under that id is answered instead of a second one.",
+        "tags": [
+          "vaults"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVault"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The vault.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteVault"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{v}/key": {
+      "get": {
+        "operationId": "vaultKey",
+        "summary": "The vault's sealed key",
+        "tags": [
+          "vaults"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The key, sealed twice, and its etag.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultKey"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putVaultKey",
+        "summary": "Set or replace the vault's key",
+        "description": "Set once, then changed only by whoever holds its etag: a second device uploading the same vault at the same moment loses loudly.",
+        "tags": [
+          "vaults"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutVaultKey"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The key as stored, with a fresh etag.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultKey"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "409": {
+            "$ref": "#/components/responses/ES_KEY_SET"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{v}/report": {
+      "post": {
+        "operationId": "report",
+        "summary": "Count conflict copies and merges",
+        "description": "For the usage ledger only.",
+        "tags": [
+          "vaults"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Report"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Counted.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/account": {
+      "get": {
+        "operationId": "account",
+        "summary": "The device's account, plan and usage",
+        "tags": [
+          "vaults"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{v}/blobs/{id}": {
+      "head": {
+        "operationId": "hasBlob",
+        "summary": "Whether the server holds a blob, and its size",
+        "tags": [
+          "blobs"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The blob's id: 43 base64url characters (an HMAC-SHA256).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Held; no body.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              },
+              "content-length": {
+                "description": "The sealed blob's size in bytes.",
+                "required": true,
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      },
+      "get": {
+        "operationId": "blob",
+        "summary": "A blob's sealed bytes",
+        "description": "The index, not the directory, says whether a blob is here: one uploaded and never committed is served until the collector forgets it.",
+        "tags": [
+          "blobs"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The blob's id: 43 base64url characters (an HMAC-SHA256).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sealed bytes.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putBlob",
+        "summary": "Upload a blob",
+        "description": "The sealed bytes as the body, with a `Content-Length`: the size is decided before a byte is read, against the plan's `max_file_bytes`, the server's own cap and the storage left (uploads not yet committed count). Idempotent: an id the server holds is answered without reading the body.",
+        "tags": [
+          "blobs"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The blob's id: 43 base64url characters (an HMAC-SHA256).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The sealed bytes.",
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Held, at this size.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlobStored"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "413": {
+            "$ref": "#/components/responses/ES_QUOTA"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{v}/commit": {
+      "post": {
+        "operationId": "commit",
+        "summary": "Commit changes, all or nothing",
+        "description": "Accepted only if every change's `parent` is its key's head. A refusal names what to do next: `ES_STALE` every conflicting key and its head, `ES_NO_BLOB` the blobs to upload. Nothing is written in either case.",
+        "tags": [
+          "log"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The `seq` of each change.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "409": {
+            "$ref": "#/components/responses/ES_STALE"
+          },
+          "413": {
+            "$ref": "#/components/responses/ES_QUOTA"
+          },
+          "422": {
+            "$ref": "#/components/responses/ES_NO_BLOB"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{v}/changes": {
+      "get": {
+        "operationId": "changes",
+        "summary": "The log after a cursor",
+        "description": "A cursor below the horizon has missed compacted rows and is refused `ES_HORIZON`: read the heads instead. `more` is `next < head`, never whether the page came back full.",
+        "tags": [
+          "log"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Entries with a `seq` above this one.",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The most entries in the page.",
+            "required": false,
+            "schema": {
+              "default": 1000,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the log.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "410": {
+            "$ref": "#/components/responses/ES_HORIZON"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{v}/heads": {
+      "get": {
+        "operationId": "heads",
+        "summary": "Every key's head, a page at a time",
+        "description": "A device that reads every page and then pulls `changes?since=<the first page's seq>` has missed nothing.",
+        "tags": [
+          "log"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "The key to start after: the last page's `next`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The most heads in the page.",
+            "required": false,
+            "schema": {
+              "default": 1000,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "anydag-sync-protocol",
+            "in": "header",
+            "description": "The sync protocol this client speaks; any other, or none, is `ES_PROTOCOL`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of heads.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeadsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "426": {
+            "$ref": "#/components/responses/ES_PROTOCOL"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/vaults/{v}/poke": {
+      "get": {
+        "operationId": "poke",
+        "summary": "Hear about commits as they land",
+        "description": "A server-sent event stream: `data: {\"seq\":N}` after each commit to the vault and a `: ping` comment every 20 s. It carries a number and nothing else: a client reads `changes` either way, so a lost poke costs a poll interval, never a change.",
+        "tags": [
+          "log"
+        ],
+        "security": [
+          {
+            "device": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "v",
+            "in": "path",
+            "description": "The vault's id: ten characters of lower-case Crockford base32.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-z]{10}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stream, open until the client goes.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "text/event-stream": {}
+            }
+          },
+          "204": {
+            "description": "This server does not poke (`ANYDAG_API_POKE=off`): poll.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ES_AUTH"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/logs": {
+      "post": {
+        "operationId": "logs",
+        "summary": "Send anonymous logs",
+        "description": "Open: an install that sends logs is usually not a device of this server. A batch over the size cap, the per-address rate or the server's is answered `{accepted: 0}` and dropped, never an error a client would retry; one that is not JSON is `ES_BAD_REQUEST`.",
+        "tags": [
+          "logs"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "How many events were kept.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogsAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/feedback": {
+      "post": {
+        "operationId": "feedback",
+        "summary": "Send a bug or an idea, made a GitHub issue",
+        "description": "Stateless: nothing of it is kept. Every file is uploaded before the issue is made, so a failed upload makes no issue. Five a minute an address, sixty in all.",
+        "tags": [
+          "feedback"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackForm"
+              },
+              "encoding": {
+                "boards": {
+                  "contentType": "application/json"
+                },
+                "notes": {
+                  "contentType": "application/json"
+                },
+                "env": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The issue.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackSent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "413": {
+            "$ref": "#/components/responses/ES_TOO_LARGE"
+          },
+          "429": {
+            "$ref": "#/components/responses/ES_RATE"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          },
+          "502": {
+            "$ref": "#/components/responses/ES_UPSTREAM"
+          },
+          "503": {
+            "$ref": "#/components/responses/ES_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/v1/admin/accounts": {
+      "get": {
+        "operationId": "adminAccounts",
+        "summary": "Every account",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every account, with its live devices and its vaults counted.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccounts"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/ES_FORBIDDEN"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      },
+      "post": {
+        "operationId": "adminCreateAccount",
+        "summary": "Make an account",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The account.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "403": {
+            "$ref": "#/components/responses/ES_FORBIDDEN"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/admin/pair": {
+      "post": {
+        "operationId": "adminPair",
+        "summary": "Mint a pairing code for an account",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairFor"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The code, shown as `XXXXX-XXXXX`.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPair"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "403": {
+            "$ref": "#/components/responses/ES_FORBIDDEN"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/admin/plans/{id}": {
+      "put": {
+        "operationId": "adminPutPlan",
+        "summary": "Write a plan's limits",
+        "description": "A plan is data: this writes it, and only `…/plan` puts an account on one.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The plan's id.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanLimits"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plan as written.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "403": {
+            "$ref": "#/components/responses/ES_FORBIDDEN"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/admin/plan": {
+      "put": {
+        "operationId": "adminPlan",
+        "summary": "Write a plan, and optionally put an account on it",
+        "description": "The one-call form `anydag-api plan set --account` mirrors.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanAndAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plan as written.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "403": {
+            "$ref": "#/components/responses/ES_FORBIDDEN"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/admin/accounts/{id}/plan": {
+      "post": {
+        "operationId": "adminSetPlan",
+        "summary": "Put an account on a plan",
+        "description": "The account is named by its id or its name.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The account, by its id or its name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanFor"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account on its new plan.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "403": {
+            "$ref": "#/components/responses/ES_FORBIDDEN"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/admin/usage": {
+      "get": {
+        "operationId": "adminUsage",
+        "summary": "The usage ledger",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account",
+            "in": "query",
+            "description": "An account, by id or name.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "The first day, `YYYY-MM-DD`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "description": "The last day, `YYYY-MM-DD`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ledger's rows.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ES_BAD_REQUEST"
+          },
+          "403": {
+            "$ref": "#/components/responses/ES_FORBIDDEN"
+          },
+          "404": {
+            "$ref": "#/components/responses/ES_NOT_FOUND"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/v1/admin/gc": {
+      "post": {
+        "operationId": "adminGc",
+        "summary": "Run the collector now",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What it did.",
+            "headers": {
+              "anydag-sync-protocol": {
+                "$ref": "#/components/headers/Protocol"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GcResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/ES_FORBIDDEN"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerFailed"
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "metrics",
+        "summary": "Prometheus metrics",
+        "description": "Latency by route template, usage, open poke streams.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The text exposition format.",
+            "content": {
+              "text/plain": {}
+            }
+          },
+          "403": {
+            "description": "`ES_FORBIDDEN`: not the admin token, or no admin token configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "ES_FORBIDDEN"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "code"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The server failed; the stack is on its stderr, never here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Info": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "features": {
+            "type": "object",
+            "properties": {
+              "sync": {
+                "type": "boolean"
+              },
+              "logs": {
+                "type": "boolean"
+              },
+              "feedback": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "sync",
+              "logs",
+              "feedback"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "features"
+        ],
+        "description": "What this server runs. `feedback` is the relay's availability, not just its switch: on without its GitHub token or repository is `false`."
+      },
+      "ServerError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "description": "A failure no `ES_*` code describes: the server's own. A client retries it; the stack is never in it."
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi"
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "protocol",
+          "mode"
+        ],
+        "description": "What a server speaks: a client reads `protocol` before anything else."
+      },
+      "Ready": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "description": "Whether the database answers."
+      },
+      "OpenApiDocument": {
+        "type": "object",
+        "properties": {
+          "openapi": {
+            "type": "string"
+          },
+          "info": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {}
+          },
+          "paths": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "openapi",
+          "info",
+          "paths"
+        ],
+        "additionalProperties": {},
+        "description": "An OpenAPI 3.1 document: this one."
+      },
+      "PairRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "platform": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            },
+            "required": [
+              "name",
+              "platform"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "device"
+        ],
+        "description": "A pairing code, and the device it pairs. The code is read as a person types it: any case, dashes and spaces ignored."
+      },
+      "PairResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "account": {
+            "$ref": "#/components/schemas/AccountRef"
+          },
+          "device": {
+            "$ref": "#/components/schemas/Device"
+          }
+        },
+        "required": [
+          "token",
+          "account",
+          "device"
+        ],
+        "description": "The device token (shown once, 43 base64url characters), its account and the device."
+      },
+      "AccountRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "description": "An account, by id and name."
+      },
+      "Device": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "created": {
+            "type": "string"
+          },
+          "seen": {
+            "description": "The last request this device made, to the day.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revoked": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current": {
+            "description": "In `GET /v1/devices`: whether this is the device asking.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "platform",
+          "created",
+          "seen",
+          "revoked"
+        ],
+        "description": "A device paired into an account."
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "ES_AUTH",
+              "ES_FORBIDDEN",
+              "ES_NOT_FOUND",
+              "ES_BAD_REQUEST",
+              "ES_STALE",
+              "ES_NO_BLOB",
+              "ES_QUOTA",
+              "ES_HORIZON",
+              "ES_PAIR",
+              "ES_KEY_SET",
+              "ES_PROTOCOL",
+              "ES_TOO_LARGE",
+              "ES_RATE",
+              "ES_UNAVAILABLE",
+              "ES_UPSTREAM"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "conflicts": {
+            "description": "`ES_STALE`: every key whose parent was wrong, with its head.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaleKey"
+            }
+          },
+          "missing": {
+            "description": "`ES_NO_BLOB`: the blob ids the server lacks.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          },
+          "horizon": {
+            "description": "`ES_HORIZON`: the lowest `seq` still in the log.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "description": "Every refusal: branch on `code`; `message` is for a person."
+      },
+      "StaleKey": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "head": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The head's `seq`, `null` when the key has never existed."
+          },
+          "blob": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The head's blob, `null` when it is a delete or there is none."
+          }
+        },
+        "required": [
+          "key",
+          "head",
+          "blob"
+        ],
+        "description": "In `ES_STALE`: where a key's head really is."
+      },
+      "DevicesResponse": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Device"
+            }
+          }
+        },
+        "required": [
+          "devices"
+        ],
+        "description": "The account's devices."
+      },
+      "Ok": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "description": "Done."
+      },
+      "VaultsResponse": {
+        "type": "object",
+        "properties": {
+          "vaults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemoteVault"
+            }
+          }
+        },
+        "required": [
+          "vaults"
+        ],
+        "description": "The account's vaults."
+      },
+      "RemoteVault": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "Sealed, base64url."
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "The last `seq` assigned: 0 for a vault nothing was committed to."
+          },
+          "created": {
+            "type": "string"
+          },
+          "keyed": {
+            "type": "boolean",
+            "description": "Whether its key was set: a vault with none is an upload that never finished."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "seq",
+          "created",
+          "keyed"
+        ],
+        "description": "A remote vault. Its `name` is sealed under the vault's own key."
+      },
+      "CreateVault": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 10,
+                "maxLength": 10,
+                "pattern": "^[0-9a-z]{10}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "description": "A new vault's sealed name, and optionally the id the device's own vault already has, kept when it is free."
+      },
+      "VaultKey": {
+        "type": "object",
+        "properties": {
+          "wrapped": {
+            "type": "string"
+          },
+          "recovery": {
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/KdfParams"
+          },
+          "etag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "wrapped",
+          "recovery",
+          "params",
+          "etag"
+        ],
+        "description": "The vault key, sealed under the passphrase's key and under the recovery key, with the KDF that opens the first."
+      },
+      "KdfParams": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kdf": {
+                "type": "string",
+                "const": "argon2id"
+              },
+              "m": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "t": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "p": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "salt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kdf",
+              "m",
+              "t",
+              "p",
+              "salt"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kdf": {
+                "type": "string",
+                "const": "scrypt"
+              },
+              "N": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "r": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "p": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "salt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kdf",
+              "N",
+              "r",
+              "p",
+              "salt"
+            ]
+          }
+        ],
+        "description": "How the passphrase's key is derived."
+      },
+      "PutVaultKey": {
+        "type": "object",
+        "properties": {
+          "wrapped": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536,
+            "description": "The vault key sealed under the passphrase's key."
+          },
+          "recovery": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536,
+            "description": "The vault key sealed under the recovery key."
+          },
+          "params": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "salt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "kdf": {
+                    "type": "string",
+                    "const": "argon2id"
+                  },
+                  "m": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "t": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "p": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "salt",
+                  "kdf",
+                  "m",
+                  "t",
+                  "p"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "salt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "kdf": {
+                    "type": "string",
+                    "const": "scrypt"
+                  },
+                  "N": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "r": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "p": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "salt",
+                  "kdf",
+                  "N",
+                  "r",
+                  "p"
+                ]
+              }
+            ]
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "wrapped",
+          "recovery",
+          "params"
+        ],
+        "description": "The vault key, sealed twice. Replacing a key takes its current `etag`."
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "copied": {
+            "description": "Conflict copies written.",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "merged": {
+            "description": "Three-way merges that succeeded.",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "Counts a client saw, for the usage ledger only. A count left out or `null` is 0."
+      },
+      "AccountInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "used": {
+            "type": "object",
+            "properties": {
+              "storage_live": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "storage_pending": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "storage_history": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "devices": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "vaults": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "storage_live",
+              "storage_pending",
+              "storage_history",
+              "devices",
+              "vaults"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "plan",
+          "used"
+        ],
+        "description": "The device's account, its plan and what it uses."
+      },
+      "Plan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "storage_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Live bytes plus bytes uploaded and never committed."
+          },
+          "history_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Superseded history kept, in sealed bytes. `null` is `storage_bytes`, and unlimited only when that is null too."
+          },
+          "max_file_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "devices": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "storage_bytes",
+          "history_days",
+          "history_bytes",
+          "max_file_bytes",
+          "devices"
+        ],
+        "description": "A plan's limits; every `null` is unlimited."
+      },
+      "BlobStored": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok",
+          "size"
+        ],
+        "description": "The blob is held, at this size: a second upload of an id the server holds is answered the same."
+      },
+      "CommitRequest": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "description": "Up to 1000 changes, no key twice, accepted whole or refused whole."
+      },
+      "Change": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            ],
+            "description": "The `seq` of the head this change was based on — a delete's too — or `null` for a key that has never had one."
+          },
+          "blob": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              }
+            ],
+            "description": "The new content's blob, or `null` for a delete."
+          },
+          "meta": {
+            "type": "string",
+            "maxLength": 65536,
+            "description": "Sealed with this change's key, blob and parent inside it."
+          }
+        },
+        "required": [
+          "key",
+          "parent",
+          "blob",
+          "meta"
+        ],
+        "description": "One change in a commit."
+      },
+      "CommitResponse": {
+        "type": "object",
+        "properties": {
+          "seqs": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "required": [
+          "seqs"
+        ],
+        "description": "The `seq` given to each change, in order."
+      },
+      "ChangesResponse": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LogEntry"
+            }
+          },
+          "next": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "The cursor to ask with next: the last `seq` returned, or `since` when none was."
+          },
+          "more": {
+            "type": "boolean",
+            "description": "Whether more entries are waiting past `next`."
+          },
+          "head": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "The vault's last `seq`."
+          },
+          "horizon": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "The lowest `seq` still in the log."
+          }
+        },
+        "required": [
+          "changes",
+          "next",
+          "more",
+          "head",
+          "horizon"
+        ],
+        "description": "Entries with `seq > since`, ascending."
+      },
+      "LogEntry": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "key": {
+            "type": "string"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blob": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "The sealed blob's size in bytes, 0 for a delete."
+          },
+          "meta": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "description": "The device that committed it: a client skips its own."
+          },
+          "at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "key",
+          "parent",
+          "blob",
+          "size",
+          "meta",
+          "device",
+          "at"
+        ],
+        "description": "A row of the log as it is read back."
+      },
+      "HeadsResponse": {
+        "type": "object",
+        "properties": {
+          "heads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Head"
+            }
+          },
+          "next": {
+            "description": "The `after` to ask with next, `null` on the last page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "heads",
+          "next",
+          "seq"
+        ],
+        "description": "A page of heads in key order, deletes included. `seq` is the vault's last when the page was read."
+      },
+      "Head": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The `parent` of the change that made this head: what its sealed `meta` is bound to."
+          },
+          "blob": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{43}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "meta": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "seq",
+          "parent",
+          "blob",
+          "size",
+          "meta"
+        ],
+        "description": "A key's current state."
+      },
+      "LogBatch": {
+        "type": "object",
+        "properties": {
+          "v": {
+            "type": "number",
+            "const": 1
+          },
+          "env": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "string",
+                "pattern": "^[0-9A-Za-z.+-]{1,32}$"
+              },
+              "shell": {
+                "type": "string",
+                "enum": [
+                  "desktop",
+                  "browser"
+                ]
+              },
+              "os": {
+                "type": "string",
+                "enum": [
+                  "linux",
+                  "darwin",
+                  "win32",
+                  "other"
+                ]
+              },
+              "arch": {
+                "type": "string",
+                "enum": [
+                  "x64",
+                  "arm64",
+                  "other"
+                ]
+              },
+              "locale": {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+                "description": "A language, and a region when there is one."
+              },
+              "install": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "description": "A random id made when somebody said yes."
+              }
+            },
+            "required": [
+              "version",
+              "shell",
+              "os",
+              "arch",
+              "locale",
+              "install"
+            ]
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "const": "app.open"
+                    },
+                    "at": {
+                      "type": "string",
+                      "description": "When it happened, an ISO instant."
+                    },
+                    "props": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "string",
+                          "enum": [
+                            "board",
+                            "note",
+                            "quiz",
+                            "table",
+                            "file",
+                            "tasks",
+                            "calendar",
+                            "quizzes",
+                            "trash",
+                            "chat",
+                            "home",
+                            "other"
+                          ]
+                        },
+                        "shell": {
+                          "type": "string",
+                          "enum": [
+                            "desktop",
+                            "browser"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "at",
+                    "props"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "const": "page.ready"
+                    },
+                    "at": {
+                      "type": "string",
+                      "description": "When it happened, an ISO instant."
+                    },
+                    "props": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "string",
+                          "enum": [
+                            "board",
+                            "note",
+                            "quiz",
+                            "table",
+                            "file",
+                            "tasks",
+                            "calendar",
+                            "quizzes",
+                            "trash",
+                            "chat",
+                            "home",
+                            "other"
+                          ]
+                        },
+                        "ms": {
+                          "type": "number",
+                          "minimum": 0,
+                          "exclusiveMaximum": 1000000000
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "at",
+                    "props"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "const": "board.open"
+                    },
+                    "at": {
+                      "type": "string",
+                      "description": "When it happened, an ISO instant."
+                    },
+                    "props": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "diagrams": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "pages": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "arch": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "erd": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "state": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "flow": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "activity": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sequence": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "class": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "usecase": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "c4": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "mindmap": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "timeline": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "gitgraph": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sketch": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "chart": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "at",
+                    "props"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "const": "feature.use"
+                    },
+                    "at": {
+                      "type": "string",
+                      "description": "When it happened, an ISO instant."
+                    },
+                    "props": {
+                      "type": "object",
+                      "properties": {
+                        "what": {
+                          "type": "string",
+                          "enum": [
+                            "export.svg",
+                            "export.png",
+                            "export.pdf",
+                            "export.md",
+                            "export.csv",
+                            "generate",
+                            "rewrite",
+                            "tidy",
+                            "search",
+                            "assistant",
+                            "import",
+                            "convert",
+                            "lock",
+                            "sync.now",
+                            "quiz.run",
+                            "upload"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "at",
+                    "props"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "const": "error"
+                    },
+                    "at": {
+                      "type": "string",
+                      "description": "When it happened, an ISO instant."
+                    },
+                    "props": {
+                      "type": "object",
+                      "properties": {
+                        "where": {
+                          "type": "string",
+                          "enum": [
+                            "page",
+                            "server"
+                          ]
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "error",
+                            "rejection",
+                            "render",
+                            "route"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "stack": {
+                          "type": "string"
+                        },
+                        "route": {
+                          "type": "string",
+                          "pattern": "^(GET|POST|PUT|DELETE|PATCH) \\/[A-Za-z0-9_/:.*-]{0,100}$"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "at",
+                    "props"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "const": "route.timing"
+                    },
+                    "at": {
+                      "type": "string",
+                      "description": "When it happened, an ISO instant."
+                    },
+                    "props": {
+                      "type": "object",
+                      "properties": {
+                        "route": {
+                          "type": "string",
+                          "pattern": "^(GET|POST|PUT|DELETE|PATCH) \\/[A-Za-z0-9_/:.*-]{0,100}$"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "errors": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "ms": {
+                          "type": "number",
+                          "minimum": 0,
+                          "exclusiveMaximum": 1000000000
+                        },
+                        "max": {
+                          "type": "number",
+                          "minimum": 0,
+                          "exclusiveMaximum": 1000000000
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "at",
+                    "props"
+                  ]
+                }
+              ]
+            },
+            "description": "Up to 200 are read; the rest are dropped."
+          }
+        },
+        "required": [
+          "v",
+          "env",
+          "events"
+        ],
+        "description": "Logs from an install that said yes, in `protocol/logs.ts`' closed vocabulary. Whatever it cannot describe is dropped, never refused: an unknown event or prop, a bad time, a batch with no event left."
+      },
+      "LogsAccepted": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "description": "How many events were kept: the whole batch, or none (over a rate, a cap, or nothing left once cleaned)."
+      },
+      "FeedbackForm": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bug",
+              "idea"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000,
+            "description": "The person's own words."
+          },
+          "boards": {
+            "description": "JSON: the boards that were ticked.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackDoc"
+            }
+          },
+          "notes": {
+            "description": "JSON: the notes that were ticked.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackDoc"
+            }
+          },
+          "env": {
+            "description": "JSON: the version, the system and the arch. A value that is not one short word is kept as `unknown`.",
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "os": {
+                "type": "string"
+              },
+              "arch": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "version",
+              "os",
+              "arch"
+            ]
+          },
+          "files": {
+            "description": "Pictures, videos, PDFs or text files.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "description": "A person's bug or idea. The caps are `protocol/feedback.ts`' (everything together at most 10 MB, five files, five boards and notes), which the page and the app's server hold too."
+      },
+      "FeedbackDoc": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 200000
+          }
+        },
+        "required": [
+          "name",
+          "text"
+        ],
+        "description": "A board or note that was ticked: its name and its whole text."
+      },
+      "FeedbackSent": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "description": "The issue the feedback became."
+      },
+      "AdminAccounts": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAccount"
+            }
+          }
+        },
+        "required": [
+          "accounts"
+        ],
+        "description": "Every account."
+      },
+      "AdminAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "created": {
+            "type": "string"
+          },
+          "devices": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "vaults": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "plan",
+          "created",
+          "devices",
+          "vaults"
+        ],
+        "description": "An account, as the operator sees it."
+      },
+      "NewAccount": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9_.@-]+$"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "description": "An account's name, and the plan to put it on (`free` when none is given)."
+      },
+      "PairFor": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "account"
+        ],
+        "description": "The account a pairing code is for, by id or name."
+      },
+      "AdminPair": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "expires": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "expires",
+          "url"
+        ],
+        "description": "A pairing code a device exchanges at `/v1/pair`, and the server's public URL."
+      },
+      "PlanLimits": {
+        "type": "object",
+        "properties": {
+          "storage_bytes": {
+            "default": null,
+            "description": "Live bytes plus bytes uploaded and never committed.",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history_days": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history_bytes": {
+            "default": null,
+            "description": "Superseded history kept, in sealed bytes; `null` is `storage_bytes`.",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_file_bytes": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "devices": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "A plan's limits: a limit left out or `null` is unlimited."
+      },
+      "PlanAndAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+          },
+          "storage_bytes": {
+            "default": null,
+            "description": "Live bytes plus bytes uploaded and never committed.",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history_days": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history_bytes": {
+            "default": null,
+            "description": "Superseded history kept, in sealed bytes; `null` is `storage_bytes`.",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_file_bytes": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "devices": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "description": "A plan's id and limits, and optionally an account (by id or name) to put on it."
+      },
+      "PlanFor": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "description": "The plan to put an account on."
+      },
+      "UsageResponse": {
+        "type": "object",
+        "properties": {
+          "usage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "description": "`YYYY-MM-DD`, UTC."
+                },
+                "account": {
+                  "type": "string"
+                },
+                "vault": {
+                  "description": "`null` for an account-wide figure (`devices_active`).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "metric": {
+                  "type": "string",
+                  "enum": [
+                    "bytes_up",
+                    "bytes_down",
+                    "commits",
+                    "changes",
+                    "conflicts_stale",
+                    "conflicts_copied",
+                    "merged",
+                    "devices_active",
+                    "storage_live",
+                    "storage_history",
+                    "blobs",
+                    "files"
+                  ]
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "day",
+                "account",
+                "vault",
+                "metric",
+                "value"
+              ]
+            }
+          }
+        },
+        "required": [
+          "usage"
+        ],
+        "description": "The usage ledger's rows."
+      },
+      "GcResult": {
+        "type": "object",
+        "properties": {
+          "compacted": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "blobs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "compacted",
+          "blobs",
+          "bytes"
+        ],
+        "description": "What the collector did."
+      }
+    },
+    "responses": {
+      "ServerFailed": {
+        "description": "The server failed; the stack is on its stderr, never here.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ServerError"
+            }
+          }
+        }
+      },
+      "ES_BAD_REQUEST_or_ES_PAIR": {
+        "description": "`ES_BAD_REQUEST`: a body or a query that does not have the shape this document gives. `ES_PAIR`: a pairing code that is unknown, used or expired.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_BAD_REQUEST",
+                        "ES_PAIR"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_QUOTA": {
+        "description": "`ES_QUOTA`: over the plan: storage, a file's size, or the number of devices.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_QUOTA"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_PROTOCOL": {
+        "description": "`ES_PROTOCOL`: the request did not say sync protocol 2 in `anydag-sync-protocol`.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_PROTOCOL"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_AUTH": {
+        "description": "`ES_AUTH`: no device token, an unknown one, or a revoked device's.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_AUTH"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_NOT_FOUND": {
+        "description": "`ES_NOT_FOUND`: no such vault, blob, device, account or plan.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_NOT_FOUND"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_BAD_REQUEST": {
+        "description": "`ES_BAD_REQUEST`: a body or a query that does not have the shape this document gives.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_BAD_REQUEST"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_KEY_SET": {
+        "description": "`ES_KEY_SET`: the vault has a key, and the `etag` sent is not its current one.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_KEY_SET"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_STALE": {
+        "description": "`ES_STALE`: a change's `parent` is not its key's head; nothing was written (`conflicts`).",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_STALE"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_NO_BLOB": {
+        "description": "`ES_NO_BLOB`: a commit names a blob the server does not hold; upload first (`missing`).",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_NO_BLOB"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_HORIZON": {
+        "description": "`ES_HORIZON`: a cursor older than the compaction horizon; read the heads (`horizon`).",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_HORIZON"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_TOO_LARGE": {
+        "description": "`ES_TOO_LARGE`: feedback bigger than the relay reads.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_TOO_LARGE"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_RATE": {
+        "description": "`ES_RATE`: over a rate: try again in a minute.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_RATE"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_UPSTREAM": {
+        "description": "`ES_UPSTREAM`: GitHub refused or failed; no issue was made.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_UPSTREAM"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_UNAVAILABLE": {
+        "description": "`ES_UNAVAILABLE`: this server has no GitHub token or repository for the relay.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_UNAVAILABLE"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ES_FORBIDDEN": {
+        "description": "`ES_FORBIDDEN`: not the admin token, or no admin token configured.",
+        "headers": {
+          "anydag-sync-protocol": {
+            "$ref": "#/components/headers/Protocol"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ErrorBody"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "ES_FORBIDDEN"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "headers": {
+      "Protocol": {
+        "description": "The sync protocol this server speaks: 2.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "securitySchemes": {
+      "device": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A device token, from `POST /v1/pair`: 43 base64url characters, shown once."
+      },
+      "admin": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The operator's `ANYDAG_API_ADMIN_TOKEN`."
+      }
+    }
+  }
+}

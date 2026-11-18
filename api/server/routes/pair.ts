@@ -22,7 +22,8 @@ import { Hono } from "hono";
 import { PAIR_MINUTES, PROTOCOL, type Device, type DevicesResponse, type Health, type PairResponse } from "../../protocol/wire";
 import type { DeviceRow, Meta } from "../meta/types";
 import { sha256 } from "../auth";
-import { body, HttpError, str, type Deps, type Vars } from "./http";
+import { PairRequest } from "../../protocol/schema";
+import { HttpError, read, type Deps, type Vars } from "./http";
 
 const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -61,13 +62,10 @@ export function pairRoutes(deps: Deps): Hono<{ Variables: Vars }> {
   app.get("/v1/health", (c) => c.json({ version: deps.version, protocol: PROTOCOL, mode: deps.config.mode } satisfies Health));
 
   app.post("/v1/pair", async (c) => {
-    const b = await body(c);
-    const typed = str(b.code, "code", 64);
-    const dev = b.device;
-    if (typeof dev !== "object" || dev === null || Array.isArray(dev))
-      throw new HttpError("ES_BAD_REQUEST", "device must be {name, platform}");
-    const name = str((dev as Record<string, unknown>).name, "device.name", 200);
-    const platform = str((dev as Record<string, unknown>).platform, "device.platform", 100);
+    const {
+      code: typed,
+      device: { name, platform },
+    } = await read(c, PairRequest);
     const canonical = canonicalCode(typed);
     const now = deps.now();
     const accountId = canonical ? await deps.meta.takePairCode(codeHash(canonical), now.toISOString()) : null;
