@@ -95,6 +95,16 @@ node scripts/check-design.mjs
 step "check:openapi"
 node scripts/openapi.mjs --check
 
+# Duplicated and over-complex code a change adds (#526). About a second each: jscpd compares clone
+# fingerprints with the commit the branch forked from, and Biome's cognitive-complexity rule runs
+# over the changed files against `scripts/complexity-baseline.json`. Existing clones and functions
+# are not a failure, only what the change adds — the whole tree's numbers are the nightly's.
+step "check:duplication"
+node scripts/check-duplication.mjs
+
+step "check:complexity"
+node scripts/check-complexity.mjs
+
 fi
 
 if [ "$part" != static ]; then

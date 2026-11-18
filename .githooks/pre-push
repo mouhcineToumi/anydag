@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 #
-# Before a push: the two cheap checks that only CI used to run, and — when asked — the browser suite
-# the push can have changed.
+# Before a push: the two cheap checks that only CI used to run, the two waste checks, and — when
+# asked — the browser suite the push can have changed.
 #
 # **What it runs, and why that and nothing else** (#258, which has the numbers). The checks that
 # went red on a pull request were the ones no hook ran: `npm run lint:promises` (typescript-eslint's
 # promise rules over `e2e/` and `desktop/` too, ~27 s) and the store's contracts over a watched vault
 # (`ANYDAG_TEST_WATCH=1 vitest run test/server`, ~18 s). They run here side by side, about half a
-# minute, so a push that would fail them does not leave the machine. The browser suite does **not**
-# run by default any more: it was the same `@smoke` grep, in the same image, that the pull request's
-# `e2e` run starts a minute later (`.github/workflows/e2e.yml`, which now also runs the specs the
-# change reaches) — a minute of every push spent repeating CI.
+# minute, so a push that would fail them does not leave the machine. The duplication and complexity
+# checks (#526) cost a second between them and are in the fast tier already; they run here too, so a
+# commit made with `ANYDAG_NO_HOOK=1` still does not push a new clone or a function over the
+# complexity threshold. The browser suite does **not** run by default any more: it was the same
+# `@smoke` grep, in the same image, that the pull request's `e2e` run starts a minute later
+# (`.github/workflows/e2e.yml`, which now also runs the specs the change reaches) — a minute of
+# every push spent repeating CI.
 #
 #   1. **Nothing new** — every pushed commit is already on a remote (`git rev-list <sha> --not
 #      --remotes` is empty: a new branch pointing at an existing commit, a tag) → skipped, with a line.
@@ -87,19 +90,27 @@ if [ -z "$code" ]; then
   exit 0
 fi
 
-# The two checks side by side, each into its own log, and the log of one that failed printed whole.
-echo "pre-push: lint:promises and the store's contracts over a watched vault"
+# The checks side by side, each into its own log, and the log of one that failed printed whole.
+echo "pre-push: lint:promises, the store's contracts over a watched vault, duplication and complexity"
 logs="$(mktemp -d)"
 trap 'rm -rf "$logs"' EXIT
 npm run --silent lint:promises >"$logs/promises" 2>&1 &
 promises=$!
 ANYDAG_TEST_WATCH=1 ANYDAG_CLOUD=on npx vitest run test/server >"$logs/watched" 2>&1 &
 watched=$!
+# The fast tier runs both already, but a commit made with ANYDAG_NO_HOOK=1 never saw it, and the
+# two cost a second between them (#526).
+node scripts/check-duplication.mjs >"$logs/duplication" 2>&1 &
+duplication=$!
+node scripts/check-complexity.mjs >"$logs/complexity" 2>&1 &
+complexity=$!
 failed=
 wait "$promises" || { echo; echo "pre-push: npm run lint:promises failed:"; cat "$logs/promises"; failed=yes; }
 wait "$watched" || { echo; echo "pre-push: ANYDAG_TEST_WATCH=1 vitest run test/server failed:"; cat "$logs/watched"; failed=yes; }
+wait "$duplication" || { echo; echo "pre-push: the duplication check failed:"; cat "$logs/duplication"; failed=yes; }
+wait "$complexity" || { echo; echo "pre-push: the complexity check failed:"; cat "$logs/complexity"; failed=yes; }
 [ -n "$failed" ] && exit 1
-echo "pre-push: both passed"
+echo "pre-push: all passed"
 rm -rf "$logs"
 trap - EXIT
 
