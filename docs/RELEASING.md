@@ -213,9 +213,10 @@ GitHub's releases feed, which lists the ten newest releases, and a beta build lo
 
 ## One-time repository setup
 
-- **Default branch** `develop`. Rulesets: `develop` and `main` require pull requests and the checks below,
-  and block force pushes and deletion; `main` allows merge commits only; `develop` allows squash and merge
-  commits. Leave `nightly/*` branches and `v*-nightly.*` tags creatable by `github-actions[bot]`, and
+- **Default branch** `develop`. Rulesets: `develop`, `main`, `release/**` and `hotfix/**` require pull
+  requests and the checks below, and block force pushes and deletion; `main` allows merge commits only;
+  `develop` allows squash and merge commits. None requires an approval while the owner is the only one
+  with write access (*Versions and releases* in `docs/architecture/gate-and-releases.md`). Leave `nightly/*` branches and `v*-nightly.*` tags creatable by `github-actions[bot]`, and
   `release/*` creatable by it too if you use *cut-release*.
 - **Settings → Actions → General:** workflow permissions *read and write* (the nightly pushes), and the
   repository's Code scanning *default setup* off (`codeql.yml` is the advanced setup).

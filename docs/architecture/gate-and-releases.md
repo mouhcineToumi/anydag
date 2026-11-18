@@ -31,10 +31,13 @@ version and kept after it ships; betas are tagged on it. Every merge into `main`
 and main is merged back into develop with the version bumped. Branches are never deleted after a
 merge. Rulesets on GitHub hold all of it: a pull request for `main`, `develop`, `release/**` and
 `hotfix/**`, no force-push or deletion, and `v*` tags and `nightly/**` branches that cannot be moved
-once made. On `develop` a pull request needs no approval (since 2026-11-17): only the owner can merge,
-so an outside one is merged after the owner has read it, and every one lands through the merge queue
-(below). A required approval there could only be met by bypassing it, which meant every merge was an
-`--admin` merge somebody had to sit and wait for.
+once made. No branch's pull request needs an approval: `develop` since 2026-11-17, `main`, `release/**`
+and `hotfix/**` since 2026-11-18 (#562). Only the owner has write access, so only the owner can merge:
+an outside pull request is merged after the owner has read it, and every one into `develop` lands
+through the merge queue (below). A required approval could only be met by bypassing it, since the owner
+cannot approve their own pull request, which meant every merge was an `--admin` merge somebody had to
+sit and wait for; 0.9.0's bench commit (#561) stopped there. **Giving anyone else write access reopens
+this**: put a required approval back on `main` and `develop` first.
 
 **The merge queue** (#503). `develop` merges about twenty-five pull requests a day, nearly all
 written by agents, and its ruleset used not to require a branch to be up to date: two pull requests
