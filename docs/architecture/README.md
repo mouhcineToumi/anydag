@@ -123,6 +123,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The desktop app | [`desktop.md`](desktop.md) |
 | The dock's tooltip | [`getting-around.md`](getting-around.md) |
 | The document tabs | [`sidebar.md`](sidebar.md) |
+| The merge queue | [`gate-and-releases.md`](gate-and-releases.md) |
 | The tabs' keys, their order and their menu | [`sidebar.md`](sidebar.md) |
 | The free canvas | [`free-canvas.md`](free-canvas.md) |
 | The graph route | [`graph.md`](graph.md) |

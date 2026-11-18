@@ -32,10 +32,39 @@ and main is merged back into develop with the version bumped. Branches are never
 merge. Rulesets on GitHub hold all of it: a pull request for `main`, `develop`, `release/**` and
 `hotfix/**`, no force-push or deletion, and `v*` tags and `nightly/**` branches that cannot be moved
 once made. On `develop` a pull request needs no approval (since 2026-11-17): only the owner can merge,
-so an outside one is merged after the owner has read it, and the owner's own are armed with
-auto-merge (`gh pr merge --auto --squash`) and land when the required checks pass. A required
-approval there could only be met by bypassing it, which meant every merge was an `--admin` merge
-somebody had to sit and wait for.
+so an outside one is merged after the owner has read it, and every one lands through the merge queue
+(below). A required approval there could only be met by bypassing it, which meant every merge was an
+`--admin` merge somebody had to sit and wait for.
+
+**The merge queue** (#503). `develop` merges about twenty-five pull requests a day, nearly all
+written by agents, and its ruleset used not to require a branch to be up to date: two pull requests
+each green on an old `develop` merged and broke it together (one push run in eight went red in the
+week before), and agents caught up by merging `develop` in by hand, restarting CI each time. GitHub's
+own merge queue is offered only to repositories an organization owns, so the queue is
+`scripts/merge-queue.mjs`, run from the maintainer's machine, with the `merge-queue` skill
+(`.claude/skills/merge-queue/`) as its driver. Three parts:
+
+- **The ruleset requires a branch to be up to date with `develop`** (`strict_required_status_checks_policy`).
+  GitHub refuses a merge that was not tested on the current `develop`, whoever asks — the queue is
+  what makes that cheap, not what enforces it.
+- **The queue does the updating, in order.** A pull request joins it by the `queue` label; the oldest
+  label goes first. The front one is brought up to date with GitHub's *update branch* (a merge commit
+  from `develop`, never a force-push; the squash into `develop` hides it), auto-merge is turned on
+  pinned to that commit, and GitHub merges it when the required checks pass. Auto-merge is turned off
+  on every other queued pull request, so none lands out of turn. A failed check is re-run once
+  (`playwright.config.ts` already retries a test once inside a run; this is for a runner that died);
+  a second failure, a policy check (`PR title`, `PR target`, `Linked issue`), a draft, another base,
+  an hour at the front, or green-but-blocked (an unresolved thread) takes it out with a comment
+  saying why. A pull request labelled again goes to the back.
+- **A conflict stops the queue** (exit 3): the merge of `develop` is left half done in a worktree
+  under the git directory, and the skill resolves it there, runs the checks, pushes the resolution to
+  the branch as a new commit, says on the pull request what it did, and starts the queue again. It
+  hands the pull request back instead when its issue is `agent: deep`, the branch is on a fork, or the
+  conflict is in the write path, sync, undo, the gate or layout — the list is in the skill.
+
+The queue works one pull request at a time, so a burst lands in sequence, one CI run on the updated
+branch apart (about two minutes at the median, fourteen at worst); it buys a green `develop`, not
+speed. One runner at a time: a lock in the git directory.
 
 **A release is a tag, and the workflow checks where it stands.** `release.yml` runs on `v*` tags that
 are not nightlies: a stable tag must be on `main` and a beta on `release/<core>` or `hotfix/<core>`.
