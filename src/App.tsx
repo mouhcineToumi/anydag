@@ -1202,6 +1202,15 @@ function useFeedbackOpen(): { open: boolean; show(): void; close(): void } {
  * owns every key on a board and is not mounted on these pages, so this is the whole of what they
  * hear. It was the note page's own until the Tasks page needed the same two.
  */
+/**
+ * A key typed into a field, or one something else took, is not the page's: a quiz field opening
+ * keeps the letters typed before its editor is there (`RichField`), and a space among them is a
+ * space, not `space A`.
+ */
+function notThePages(e: KeyboardEvent): boolean {
+  return typing(e.target) || e.defaultPrevented;
+}
+
 function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }) {
   const ref = useRef(on);
   ref.current = on;
@@ -1217,9 +1226,7 @@ function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }
         ref.current.settings();
         return;
       }
-      /* A key something else took is not the page's: a quiz field opening keeps the letters typed
-         before its editor is there (`RichField`), and a space among them is a space, not `space A`. */
-      if (typing(e.target) || e.defaultPrevented) {
+      if (notThePages(e)) {
         leader = false;
         return;
       }

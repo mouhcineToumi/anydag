@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type KeyboardEvent as KeyEvent, type ReactNode } from "react";
+import { useEffect, type KeyboardEvent as KeyEvent, type ReactNode } from "react";
+
+import { nextRow, useMenuCard } from "@/ui/menuCard";
 
 type Data = Record<`data-${string}`, string | undefined>;
 
@@ -11,8 +13,8 @@ type Data = Record<`data-${string}`, string | undefined>;
  * **It is attached to its button, so nothing about it is a tooltip** drawn somewhere else (#257's
  * eighth problem). `numbered` lets `1`–`9` choose a row, as the kinds' tiles say.
  *
- * Escape is taken in the capture phase and stopped, so the innermost thing closes first: an open
- * field under it is not closed by the same key.
+ * Its open state and how it shuts are `useMenuCard`'s: Escape closes the innermost thing first, so an
+ * open field under it is not closed by the same key.
  */
 export function Menu({
   label,
@@ -42,29 +44,7 @@ export function Menu({
    */
   children(close: () => void): ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const toggle = useRef<HTMLButtonElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setOpen(false);
-      toggle.current?.focus();
-    };
-    addEventListener("pointerdown", away, true);
-    addEventListener("keydown", esc, true);
-    return () => {
-      removeEventListener("pointerdown", away, true);
-      removeEventListener("keydown", esc, true);
-    };
-  }, [open]);
+  const { open, setOpen, box, toggle, menu } = useMenuCard(true);
 
   useEffect(() => {
     if (!open) return;
@@ -93,12 +73,9 @@ export function Menu({
       setOpen(false);
       return;
     }
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
-    if (all.length === 0) return;
+    const next = nextRow(all, e.key);
+    if (next === null) return;
     e.preventDefault();
-    const at = all.indexOf(document.activeElement as HTMLButtonElement);
-    const next =
-      e.key === "Home" ? 0 : e.key === "End" ? all.length - 1 : (at + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length;
     all[next]?.focus();
   };
 

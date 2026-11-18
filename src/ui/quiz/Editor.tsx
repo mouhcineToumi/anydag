@@ -148,6 +148,53 @@ function problemsOf(diagnostics: QuizDiagnostic[], questions: Question[], i: num
  * Drag one of a list's rows to another place: a mark where it would land while it moves, and
  * `onDrop(to)` — the index it ends at, `splice`'s — on release. Pointer events, `startDrag`'s shape.
  */
+/** What the form's fields are called, for each kind: a flashcard has a front and a back. */
+interface FieldWords {
+  prompt: { label: string; note?: string; placeholder: string };
+  bodyNote: string;
+  why: { label: string; note: string; placeholder: string };
+}
+const CHOICE_WORDS: FieldWords = {
+  prompt: { label: "Question", placeholder: "What do you want to ask?" },
+  bodyNote: "optional, under the question",
+  why: { label: "Explanation", note: "optional, shown after they answer", placeholder: "Why the right answer is right" },
+};
+const WORDS: Record<Kind, FieldWords> = {
+  one: CHOICE_WORDS,
+  several: CHOICE_WORDS,
+  written: {
+    ...CHOICE_WORDS,
+    why: { label: "Model answer", note: "shown once they have written theirs", placeholder: "The answer you expect" },
+  },
+  card: {
+    prompt: { label: "Front", note: "what they see first", placeholder: "A question, a term, a prompt" },
+    bodyNote: "optional, on the front",
+    why: { label: "Back", note: "shown when they turn the card", placeholder: "The answer on the back" },
+  },
+};
+
+/**
+ * Why an answer keeps its place when the answers shuffle: pinned by hand, by its own words ("All of
+ * the above" speaks about the answers around it, `pinned`), or not at all. The pin's title and its
+ * `data-dag-quiz-pin` say which.
+ */
+type PinState = "hand" | "words" | "free";
+const PIN_TITLE: Record<PinState, string> = {
+  hand: "Keeps its place when the answers shuffle — click to let it move",
+  words: "Keeps its place: it speaks about the answers around it",
+  free: "Keep its place when the answers shuffle",
+};
+const PIN_ATTR: Record<PinState, string | undefined> = { hand: "", words: "words", free: undefined };
+function pinState(o: Question["options"][number]): PinState {
+  if (o.pin) return "hand";
+  return pinned(o) ? "words" : "free";
+}
+
+/** An answer's text field: `data-dag-quiz-wants` marks one left blank, which the form asks for. */
+function answerAttrs(blank: boolean): Record<string, string> {
+  return blank ? { "data-dag-quiz-option-text": "", "data-dag-quiz-wants": "" } : { "data-dag-quiz-option-text": "" };
+}
+
 function dragRow(e: ReactPointerEvent, row: HTMLElement | null, rows: () => HTMLElement[], onDrop: (to: number) => void): void {
   if (!row) return;
   e.preventDefault();
@@ -321,6 +368,7 @@ function QuestionCard({
     setFresh(input.options.length);
   };
   const kind = kindOf(q);
+  const words = WORDS[kind];
   const shown = problems.flatMap((d) => {
     const s = said(d, q);
     return s && !(quiet && unfinished(s.code)) ? [s] : [];
@@ -540,10 +588,10 @@ function QuestionCard({
       ) : null}
       <RichField
         variant="line"
-        label={kind === "card" ? "Front" : "Question"}
+        label={words.prompt.label}
         shown
-        note={kind === "card" ? "what they see first" : undefined}
-        placeholder={kind === "card" ? "A question, a term, a prompt" : "What do you want to ask?"}
+        note={words.prompt.note}
+        placeholder={words.prompt.placeholder}
         md={q.prompt}
         readOnly={held}
         autoFocus={focus}
@@ -557,7 +605,7 @@ function QuestionCard({
           variant="block"
           label="Details"
           shown
-          note={kind === "card" ? "optional, on the front" : "optional, under the question"}
+          note={words.bodyNote}
           placeholder="A code sample, a picture, an equation"
           md={q.body}
           readOnly={held}
@@ -628,11 +676,7 @@ function QuestionCard({
                   readOnly={held}
                   autoFocus={fresh === i}
                   className="dag-quiz__option-text"
-                  attrs={
-                    emptyAnswers.has(i)
-                      ? { "data-dag-quiz-option-text": "", "data-dag-quiz-wants": "" }
-                      : { "data-dag-quiz-option-text": "" }
-                  }
+                  attrs={answerAttrs(emptyAnswers.has(i))}
                   onCommit={(text) => setOption(i, { text })}
                 />
                 {shuffle ? (
@@ -641,15 +685,9 @@ function QuestionCard({
                     className="dag-icon dag-quiz__pin"
                     aria-pressed={pinned(o)}
                     disabled={held || (!o.pin && pinned(o))}
-                    title={
-                      o.pin
-                        ? "Keeps its place when the answers shuffle — click to let it move"
-                        : pinned(o)
-                          ? "Keeps its place: it speaks about the answers around it"
-                          : "Keep its place when the answers shuffle"
-                    }
+                    title={PIN_TITLE[pinState(o)]}
                     aria-label={`Keep answer ${i + 1} in its place`}
-                    data-dag-quiz-pin={o.pin ? "" : pinned(o) ? "words" : undefined}
+                    data-dag-quiz-pin={PIN_ATTR[pinState(o)]}
                     onClick={() => setOption(i, { pin: !o.pin })}
                   >
                     <Pin size={14} strokeWidth={2} aria-hidden="true" />
@@ -683,22 +721,10 @@ function QuestionCard({
       )}
       <RichField
         variant="block"
-        label={kind === "card" ? "Back" : kind === "written" ? "Model answer" : "Explanation"}
+        label={words.why.label}
         shown
-        note={
-          kind === "card"
-            ? "shown when they turn the card"
-            : kind === "written"
-              ? "shown once they have written theirs"
-              : "optional, shown after they answer"
-        }
-        placeholder={
-          kind === "card"
-            ? "The answer on the back"
-            : kind === "written"
-              ? "The answer you expect"
-              : "Why the right answer is right"
-        }
+        note={words.why.note}
+        placeholder={words.why.placeholder}
         md={q.why}
         readOnly={held}
         attrs={{ "data-dag-quiz-why": "" }}
