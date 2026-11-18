@@ -13,7 +13,20 @@ import type { Json } from "./document";
 
 const SAFE = 9007199254740991;
 
-const cell = (s: string): string => s.replace(/\|/g, "\\|").replace(/\n+/g, " ");
+/**
+ * `s` as one table cell. A pipe is escaped (`\|`, which GFM honours inside a code span too); any other
+ * backslash is left alone, since inside a code span — where the patterns are — it is literal, and
+ * doubling it would show `^\\d`. A backslash just before a pipe cannot be written in a cell at all
+ * (`\\|` reads as an escaped backslash and then a column), so it is refused rather than drawn wrong.
+ */
+function cell(s: string): string {
+  return s
+    .replace(/\\?\|/g, (m) => {
+      if (m.length === 2) throw new Error(`openapi: a table cell cannot hold a backslash before a pipe: ${s}`);
+      return "\\|";
+    })
+    .replace(/\n+/g, " ");
+}
 const anchor = (name: string): string => `schema-${name.toLowerCase()}`;
 const opAnchor = (id: string): string => `op-${id.toLowerCase()}`;
 const refName = (ref: string): string => ref.replace(/^#\/components\/schemas\//, "");
