@@ -67,12 +67,61 @@ The queue works one pull request at a time, so a burst lands in sequence, one CI
 branch apart (about two minutes at the median, fourteen at worst); it buys a green `develop`, not
 speed. One runner at a time: a lock in the git directory.
 
+**The visual review** (#528) is the merge queue's pattern applied to how the app looks: a script
+on the maintainer's machine, `scripts/visual-review.mjs`, driven by the `visual-review` skill
+(`.claude/skills/visual-review/`) in the maintainer's own Claude Code or OpenCode. **Nothing of it
+runs in CI and it needs no secret**; the pixel comparison above stays the gate. The comparison catches
+a change nobody meant; it cannot catch one somebody meant that looks wrong — the baseline is
+regenerated and committed, and the check passes — nor drift from `DESIGN.md` that looks plausible on
+its own. `node scripts/visual-review.mjs <pr>`:
+
+- **Skips at once** a pull request that touches nothing the chrome is drawn from (`src/styles/`,
+  `src/ui/`, `src/settings/`, `src/blocks/`, `src/feedback/`, `src/telemetry/`, `themes/`,
+  `DESIGN.md`, `e2e/surfaces.spec.ts`, or a baseline but the diagram's `reference` and `export`
+  ones): it prints `{"skip": true}` after one `gh` call, and the skill stops there — no Docker, no
+  agent, no cost.
+- **Renders both sides**: two worktrees under the git directory (`.git/visual-review/base`, `…/head`),
+  at the merge base and at `refs/pull/<n>/head`, each running the chrome's screenshot specs (every
+  spec with a `toHaveScreenshot` but `reference` and `export`; `e2e/surfaces.spec.ts` holds every
+  top-level surface in light and dark) through `scripts/e2e-docker.sh` with its snapshot folders
+  emptied, so every picture is a fresh render in the pinned image. The worktrees and their Docker
+  `node_modules` volumes are kept between runs, and a capture of the same two commits is reused.
+- **Pairs the pictures** into `.git/visual-review/pr-<n>/{before,after,diff}/`, compared pixel by
+  pixel (`scripts/lib/png.mjs`, no dependency): a pair whose moved pixels are under a ten-thousandth
+  of it is `same`, the rest `changed`, `new` or `removed`, in `manifest.json` beside the code's
+  `diff.patch`. The agent reads the changed pairs, `DESIGN.md` and the skill's critique checklist
+  (`references/critique.md`, written for this repository from the *impeccable* skill's critique and
+  audit dimensions; impeccable itself is used when installed, and nothing depends on it), and writes
+  `review.json`.
+- **Posts one comment**, edited in place on a re-run (a hidden marker finds it): the regressions with
+  their before and after, the notes, what changed and looks right. The pictures are pushed as one
+  commit to `refs/visual-review/pr-<n>` — outside `refs/heads`, so no clone fetches it and no
+  workflow starts — and linked by that commit's sha; each review's commit is chained on the last, so
+  an older comment's pictures stay reachable.
+
+**`--all`** renders every surface at `origin/develop` (or a ref) for an audit of the whole app's
+chrome, a step before a release (`docs/RELEASING.md`): the agent writes `report.md` beside the
+pictures and offers its findings as issues. **It is advisory.** Whether a regression it reports
+should hold a pull request — the queue could run it on a queued one that changes chrome — is decided
+after a few weeks of seeing how often it is right.
+
 **A release is a tag, and the workflow checks where it stands.** `release.yml` runs on `v*` tags that
 are not nightlies: a stable tag must be on `main` and a beta on `release/<core>` or `hotfix/<core>`.
 It runs the whole tier — `checks.yml` with the api's harness and its Postgres suites, `e2e.yml` with
 `scope: full`, the desktop app packaged and opened on Linux, Windows and macOS (signing where the
 secrets allow — see *The desktop app*) — and publishes only when `scripts/check-release-assets.mjs`
 finds every installer and the update feeds for the version's channel.
+
+**A stable release carries its development health report** (#529). After publishing, `release.yml`
+runs `node scripts/release-report.mjs <version>` and attaches the JSON and the Markdown to the release.
+The script gathers the window **since the previous stable tag** — fixed by the tags, not by the clock —
+from the tags, the GitHub API and `docs/bench/`, and writes `docs/metrics/<version>.json`, the raw
+record, plus the report rendered from every JSON in that folder. Each metric has a value, a rolling
+7-day value and a trend across the releases before it; a metric whose source does not exist yet (or
+depends on #526, #527, #112 or #528) says `n/a` and why. The back-merge commits the files
+([`docs/RELEASING.md`](../RELEASING.md), steps 9–10), so the next release renders the trend offline and
+a moved number is a diff. The report informs; it gates nothing. Definitions, the window and the
+security-counts-only rule: [`docs/metrics/README.md`](../metrics/README.md).
 
 **A nightly is built from develop by itself.** `nightly.yml` runs at 02:00 UTC (and by hand): if
 develop has moved since the last one, it makes a `nightly/<version>` branch holding one commit that
@@ -96,7 +145,11 @@ stable build never sees a pre-release and a nightly build follows nightlies. `de
 `allowDowngrade`. **electron-builder does not read the channel off the version for the `github`
 provider** (its `detectUpdateChannel` is for `generic` and S3-like ones), so `desktop/package.mjs`
 passes `-c.publish.channel=<word>` for a pre-release, and fails a build whose update files do not match
-its channel. Without it every nightly wrote `latest*.yml` and none published (#116).
+its channel. Without it every nightly wrote `latest*.yml` and none published (#116). The word is the
+*default*: Settings → About lets a person follow another channel on their machine (#525), handed to
+the updater as a feed (`desktop/feed.ts`), still without `autoUpdater.channel`, and going back to a
+steadier channel installs an older version only after the person confirms it (*Updates* in
+[`desktop.md`](desktop.md)). Nothing about how a release or a nightly publishes changed with it.
 
 **The file names are the updater's URLs**, so none has a space: `AnyDag-<v>.AppImage`,
 `AnyDag-Setup-<v>.exe`, `AnyDag-<v>-<arm64|x64>.dmg` and `.zip`. electron-builder's default
@@ -223,8 +276,9 @@ checks, one line saying so; only prose changed (a `.md` outside `boards/`, or `d
 
 **The browser selection** is `scripts/e2e-plan.mjs`'s answer for the diff against `origin/develop` (else
 `origin/main`, else the whole suite), one `--grep`: docs, CI config and unit tests run nothing;
-application code the `@smoke` tier; what can move pixels (`boards/`, `icons/`, the drawing layers of
-`src/`) also `reference.spec.ts`; `api/` and `server/sync/` also `sync.spec.ts`; and a change under
+application code the `@smoke` tier; what can move pixels (`boards/`, `icons/`, `themes/`, the drawing
+layers of `src/`) also `reference.spec.ts` and `surfaces.spec.ts`; the chrome (`src/ui/`, `src/settings/`)
+also `surfaces.spec.ts`, every top-level surface in light and dark (#528); `api/` and `server/sync/` also `sync.spec.ts`; and a change under
 `e2e/` the specs Playwright's `--only-changed` traces it to. A pull request's shards run it; so does
 `ANYDAG_PREPUSH_E2E=1 git push`, in the image when Docker answers, else on the host with no screenshots,
 and it says which. The number of browsers comes from the machine (`scripts/e2e-lib.sh`: cores − 2 and

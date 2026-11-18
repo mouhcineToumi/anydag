@@ -25,7 +25,9 @@ describe("kindOf", () => {
     ["src/styles/chrome.css", "pixels"],
     ["src/styles/chrome/03-sidebar.css", "pixels"],
     ["icons/data/icons.json", "pixels"],
-    ["src/ui/Sidebar.tsx", "app"],
+    ["themes/paper/theme.json", "pixels"],
+    ["src/ui/Sidebar.tsx", "chrome"],
+    ["src/settings/panes/About.tsx", "chrome"],
     ["src/note/markdown.ts", "app"],
     ["server/vault.ts", "app"],
     ["cli/main.ts", "app"],
@@ -58,13 +60,17 @@ describe("plan", () => {
   });
 
   it("runs the smoke tier for application code", () => {
-    expect(plan(["src/ui/Sidebar.tsx"])).toMatchObject({ run: true, grep: "@smoke" });
     expect(plan(["server/routes/docs.ts", "README.md"])).toMatchObject({ run: true, grep: "@smoke" });
   });
 
   it("adds the screenshots when a change can move pixels", () => {
-    expect(plan(["src/layout/route.ts"]).grep).toBe("@smoke|reference\\.spec\\.ts");
-    expect(plan(["boards/local/reference/erd.board.md"]).grep).toBe("@smoke|reference\\.spec\\.ts");
+    expect(plan(["src/layout/route.ts"]).grep).toBe("@smoke|reference\\.spec\\.ts|surfaces\\.spec\\.ts");
+    expect(plan(["boards/local/reference/erd.board.md"]).grep).toBe("@smoke|reference\\.spec\\.ts|surfaces\\.spec\\.ts");
+  });
+
+  it("adds every surface's light and dark pictures when the chrome changes", () => {
+    expect(plan(["src/ui/Sidebar.tsx"])).toMatchObject({ run: true, grep: "@smoke|surfaces\\.spec\\.ts" });
+    expect(plan(["src/settings/panes/About.tsx"]).grep).toBe("@smoke|surfaces\\.spec\\.ts");
   });
 
   it("adds the sync spec for the sync server", () => {
@@ -88,7 +94,7 @@ describe("plan", () => {
 
   it("is the union of everything the changes ask for", () => {
     const p = plan(["src/render/Math.tsx", "e2e/math.spec.ts", "docs/x.md"], () => ["math.spec.ts"]);
-    expect(p.grep).toBe("@smoke|math\\.spec\\.ts|reference\\.spec\\.ts");
+    expect(p.grep).toBe("@smoke|math\\.spec\\.ts|reference\\.spec\\.ts|surfaces\\.spec\\.ts");
   });
 
   it("proves the suite still runs when the way it is run changes", () => {

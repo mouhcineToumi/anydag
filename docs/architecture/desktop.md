@@ -20,9 +20,10 @@ failed on both.
 | Where | Owns |
 |---|---|
 | `desktop/main.ts` | the server child, the `anydag://` scheme, windows, deep links, the shim, the keys, the updater's wiring |
-| `desktop/updates.ts` | the update state machine: `idle · checking · downloading · ready · manual · error`, the six-hour re-check, the install; no Electron import |
+| `desktop/updates.ts` | the update state machine: `idle · checking · downloading · ready · manual · downgrade · error`, the six-hour re-check, the install, the channel followed and the confirmed downgrade; no Electron import |
+| `desktop/feed.ts` | the releases a chosen update channel reads: electron-updater's GitHub provider handed a view of the updater whose `channel` is the choice (#525) |
 | `desktop/forward.ts` | a page request sent on to the server over `node:http`, and let go of when the page lets go |
-| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key, the system's locale, the updates (`state`, `onChange`, `check`, `install`) |
+| `desktop/preload.ts` | `window.anydagDesktop`: the folder dialog, reveal, the keys (written, never read), the page's write key, the system's locale, the updates (`state`, `onChange`, `check`, `install`, `setChannel`, `downgrade`) |
 | `desktop/build.mjs` · `electron-builder.yml` | the two CJS bundles; what is packed, and what is unpacked for the child |
 | `desktop/package.mjs` | electron-builder for this OS: whether to sign, and the second macOS architecture's watcher |
 | `desktop/smoke.mjs` | the packaged app's one check, on all three systems |
@@ -92,7 +93,7 @@ Nineteen things are load-bearing:
     Settings → About says *Check for updates*. One question at a time, and nothing while an update
     is downloading, ready or waiting: those answers cannot change before the next launch. Only a
     packaged app asks (`enabled`); `desktop:dev` and the smoke run never do, and the page then draws
-    no button and no update facts. The channel is still the version's own (`UPDATE_CHANNEL`).
+    no button and no update facts.
   - **A build that cannot install says `manual`** and downloads nothing (`autoDownload` is off): an
     unsigned macOS build (`SIGNED`), and an AppImage whose file or folder the person cannot write
     to (`canInstallUpdates`). The button then opens that version's release page —
@@ -109,10 +110,45 @@ Nineteen things are load-bearing:
     `quitAndInstall`, say a `.AppImage` that cannot be replaced), the state is `error`, `quitting` is
     cleared and `restartServer()` brings the server back, so the app is whole again rather than
     running with no server.
+  - **The channel is the version's own until the person chooses another** (#525). Settings → About
+    has an *Update channel* select — Stable, Beta, Nightly — in the desktop app only, and only when
+    `enabled`. The choice is this machine's: `update-channel.json` in the app's home, written by the
+    main process, never a vault's and never synced. **With no choice made nothing differs from before
+    there was one**: `allowPrerelease` is `UPDATE_CHANNEL !== "latest"` and the updater keeps the
+    provider `app-update.yml` gave it (`test/desktop-updates.test.ts` pins it for all three words).
+    A choice that differs from the version's own sets `allowPrerelease` from it and points the
+    updater at it with `setFeedURL` (`desktop/feed.ts`), from the next check on; Settings' *Check for
+    updates* is the check at once. A check in flight answers for the old channel first, an answer
+    found on the old channel is dropped, and a download in hand is kept.
+    - **`autoUpdater.channel` is never set**, for the reason `UPDATE_CHANNEL`'s comment gives: its
+      setter turns on `allowDowngrade`. `allowPrerelease` alone cannot follow a channel either,
+      because electron-updater's GitHub provider picks the release by the updater's `channel` or, with
+      none, the running version's word — so a stable build allowed pre-releases takes the newest
+      release of any kind (a beta as readily as a nightly), a beta build skips every nightly, and a
+      nightly build sees only nightlies. `feed.ts` hands the GitHub provider, unchanged, an object
+      made with `Object.create(updater)` whose own `channel` is the choice: the provider reads the
+      chosen word and, through the prototype, the live `allowPrerelease` and `currentVersion`, and
+      the real updater is not written. `test/desktop-feed.test.ts` runs the provider against a fake
+      GitHub whose newest release is a beta.
+    - **A downgrade is asked for, never taken.** On a chosen channel, a check whose newest release is
+      older than the running version (`update-not-available` carries it) ends in `downgrade` with
+      that version, and About says so — *You are on 0.8.0-nightly…; the newest stable is 0.7.0.
+      Installing it is a downgrade.* — with *Install 0.7.0…*, which asks again in an alert dialog.
+      Only its yes calls `downgrade(version)`, and the main process ignores any version but the one
+      offered. That runs **one** check with `allowDowngrade` on and `autoDownload` off, and turns both
+      back in a `finally`; it then fetches what the check found only if that is the confirmed version
+      or newer — another older one is offered again, not fetched — and the restart is the Update
+      button's, as for any update. On a build that cannot install (`manual`), the yes opens the
+      release page instead, and `allowDowngrade` is never touched. The version's own channel never
+      offers a downgrade: an older release there is `idle`, as before.
+    - After the update installs, the choice is still on the disk, and is usually the new version's
+      own channel: a stable build set to Nightly that installs a nightly is a nightly following
+      nightlies, on the plain provider.
   - **Not verified here:** the restart itself. A packaged app updating to a published release can
     be run only on a published release, on each system; nothing in the suite does it. The state
     machine and the quit order are held by the unit test against a fake updater, the page's half
-    by `e2e/update.spec.ts` against a stub of the bridge.
+    by `e2e/update.spec.ts` against a stub of the bridge. Nor is an installer run over a newer
+    version — the downgrade's last step — on any system.
 - **The token is the main process's alone.** It is minted per launch and handed to the child in its
   environment — never on its command line, which every user of the machine can read — and
   `protocol.handle("anydag")` adds it to every `/__board/*` and `/api/*` request it forwards to
