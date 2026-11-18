@@ -62,6 +62,19 @@
         // `[^]` is JavaScript's "any character", and four files use it on purpose.
         "noEmptyCharacterClassInRegex": "off"
       },
+      // Cognitive complexity is measured by `scripts/check-complexity.mjs`, not by `biome lint`:
+      // 306 functions were already over 20 when the check landed (#526), and printing all of them
+      // in every lint run would bury the one line a change is about. The script runs this rule with
+      // `--only` over the files a change touches and over the whole tree, and fails only on a
+      // function the baseline (`scripts/complexity-baseline.json`) does not hold. The number is here
+      // so the two cannot disagree — the baseline records the threshold it was taken at.
+      // See *Duplication and complexity* in `docs/architecture/gate-and-releases.md`.
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "off",
+          "options": { "maxAllowedComplexity": 20 }
+        }
+      },
       "suspicious": {
         "preset": "recommended",
         // `while ((m = re.exec(s)))` is how the code walks matches.

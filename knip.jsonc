@@ -18,6 +18,8 @@
     "e2e/**/*.ts",
     "test/**/*.ts",
     "api/test/**/*.ts",
+    // scripts/openapi.mjs bundles it by name, in an esbuild entry written as a string.
+    "api/openapi/markdown.ts",
     "plugins/**/*.ts"
   ],
   "project": ["**/*.{ts,tsx,mjs}", "!icons/data/**", "!boards/**", "!**/dist/**"],
