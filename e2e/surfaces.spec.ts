@@ -29,6 +29,7 @@ import { newFile, openSettings, openSidebar, type SettingsTab, settingsTab } fro
  *   folder's path on disk (the vault is a fresh temp folder). The graph's WebGL drawing is hidden
  *   rather than masked, since its layout is a simulation's (`graph.spec.ts` says why it has no
  *   baseline of its own): what this one holds is the page around it.
+ * - **A vault's mark wears one hue**, which it otherwise takes from the vault's id, new every run.
  * - **A dialog's own focus is kept**: what has the caret on opening is part of how it looks.
  *
  * Settings → AI and Settings → Shortcuts are `settings.spec.ts`'s already, and a note's callouts
@@ -176,8 +177,18 @@ test.afterEach(() => {
 async function go(page: Page, theme: Theme, query: string, { clock = true } = {}): Promise<void> {
   if (clock) await page.clock.setFixedTime(NOW);
   await page.goto(`/?${query}${query ? "&" : ""}vault=${ws}&theme=${theme}`);
-  await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+  /* Longer than an assertion's default: the first visit to a page compiles its chunks on a cold dev
+     server, which is every page in the visual review's fresh worktrees. */
+  await expect(page.locator("html")).toHaveAttribute("data-theme", theme, { timeout: 30_000 });
+  await page.addStyleTag({ content: ONE_HUE });
 }
+
+/**
+ * A vault's mark takes its hue from the vault's id, and every run makes new ones: this spec's, and
+ * the suite's own in the Docker image's fresh home. One hue for every mark, still the theme's own.
+ */
+const ONE_HUE =
+  ".dag-vault__mark { --vault-h: var(--dag-color-hues-teal) !important; --vault-t: var(--dag-tint-teal) !important; }";
 
 /** Every font in, and nothing still moving. */
 async function settled(page: Page): Promise<void> {
