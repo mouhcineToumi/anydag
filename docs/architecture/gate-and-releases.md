@@ -130,7 +130,9 @@ pre-release. It keeps the GitHub *releases* of the newest seven nightlies and ne
 branch — electron-updater reads the ten newest releases, and ten nightlies in a row would hide a
 beta's next version from it. Beside the build it runs the two resource guards,
 `node scripts/bench.mjs --guard` (idle CPU on a 1k-file vault, a 200-node layout), which go red on a
-2x regression and hold nothing back — see *The bench* in [`limits.md`](limits.md). And it keeps
+2x regression and hold nothing back, and the whole bench at every vault size (`bench, full`), whose
+JSON is kept ninety days as the run's `bench-<version>` artifact so the numbers can be plotted night
+over night — see *The bench* in [`limits.md`](limits.md). And it keeps
 **an issue per test that passed only on retry** (#494): the suite retries a failed test once, so a
 flake leaves the run green; the `flaky tests` job merges the full suite's shards into Playwright's
 JSON, lists the flaky tests with `scripts/flaky.mjs`, and opens an issue for each
@@ -287,6 +289,7 @@ beside its title and gets no pin. See *A page that names no vault lands in the s
 | `pr-policy.yml` → `PR title`, `PR target`, `Linked issue` | a Conventional Commit title; `main` only from `release/*` or `hotfix/*`; a pull request into develop closes a `status: ready` issue (the owner, bots and a PR labelled `no-issue` exempt) | every pull request event, including an edit or a label |
 | `nightly.yml`, `release.yml`, `cut-release.yml` | see *Versions and releases* | a schedule, a tag, a button |
 | `deploy.yml` → `backup and restore` | the api's deployment restored: a stack up, data through Caddy, `backup.sh`, a fresh stack, `restore.sh`, and the data read back | pull requests and pushes that touch `deploy/**` or `api/**`; a weekly cron (Monday 03:15 UTC); a button |
+| `bench.yml` → `base against head` | when the change can reach the built page or server (`scripts/bench-plan.mjs`), the edit timings of the pull request's head and its merge base, built and measured in turn on one runner (`scripts/bench-compare.mjs`); the table in the summary and in one comment on the pull request; red only on a large regression of a stable metric — *The bench* in [`limits.md`](limits.md) | pull requests into `develop`; advisory, not required |
 | `codeql.yml`, `dependency-review.yml` | static security analysis; new dependencies' advisories and licences | pull requests and develop; not required |
 
 `CI passed` and `e2e` are summary jobs: a reusable workflow's jobs do not exist when the job that calls
