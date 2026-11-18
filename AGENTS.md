@@ -83,7 +83,10 @@ It is also the pre-commit hook; do not skip it with `--no-verify`, and do not pu
   (`npm run check:skill` holds the skill to the code).
 - **A new route or MCP tool is a line in `docs/parity.json`** in the same commit, and so is a new
   `anydag` command — which is added only for admin work; every other feature marks the CLI column
-  `{"admin": false}`. Run `npm run parity` to redraw `docs/PARITY.md`. The checks fail otherwise.
+  `{"admin": false}`. Run `npm run parity` to redraw `docs/PARITY.md`. A new route of the local
+  server is also a row in `server/schema/`, its body read through it, and `npm run openapi`
+  regenerates `docs/api/local.openapi.json` (*The local OpenAPI document* in `server.md`). The checks
+  fail otherwise.
 - The browser suite runs in CI in the Playwright Docker image. To run it yourself use
   `npm run e2e:docker`. Run only the specs for the area you changed when iterating, and measure
   flakiness at no more workers than the machine has cores.
@@ -139,6 +142,7 @@ These are the short form of `CLAUDE.md`; the reasons are in `docs/architecture/`
 | the map of the code, layers, the bites | [`CLAUDE.md`](CLAUDE.md), then [`docs/architecture/`](docs/architecture/README.md) |
 | the grammar, one sheet per diagram type | `docs/dsl/` |
 | every feature against its route, command and tool | `docs/parity.json`, `docs/PARITY.md` |
+| every route of the local server, what it takes and answers | `docs/api/local.openapi.json` and its reference `docs/api/local.md` (generated; `GET /api/openapi.json` on a running server) |
 | how a release is cut | `docs/RELEASING.md` |
 | the agent skill for drawing on the canvas | `skills/anydag/` |
 | the landing page at anydag.com | `site/` — plain HTML, CSS and JS, no build ([README](site/README.md)) |

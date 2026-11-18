@@ -22,6 +22,7 @@ rather than a service on another port (`server/grammar.ts`, `server/handle.ts`).
 | `server/parse-store.ts` · `searching.ts` | what the grammar parsed, kept in `<home>/parse.sqlite` · a vault's corpus and search, answered in the worker |
 | `server/words.ts` · `upkeep.ts` | the corpus's words, an FTS5 index beside its rows in `parse.sqlite` · that index kept up to date as a watched vault changes |
 | `server/routes/` | one module per family: documents, folders, files, meta, events, vaults, preferences |
+| `server/schema/` · `server/openapi.ts` | each family's request bodies, answers and route rows, as zod · the table they make, and the OpenAPI document (*The local OpenAPI document*) |
 | `server/mcp/` | the MCP server: `TOOLS`, each calling its route |
 | `server/connect.ts` | how the CLI and MCP reach a server: `server.json`, or one in-process |
 
@@ -142,6 +143,56 @@ Nine things are load-bearing:
   keychain through `safeStorage`.
 
 `test/server/` is the store contract and the routes in vitest over a real folder and a real index.
+
+## The local OpenAPI document
+
+The server describes itself in **OpenAPI 3.1, generated from the code** (#531), through the builder
+the sync api server's document goes through (*The OpenAPI document* in [`api.md`](api.md)):
+`GET /api/openapi.json` answers it, behind the token and `Host` gate like every route, and
+[`docs/api/local.openapi.json`](../api/local.openapi.json) is the committed copy, with its reference
+beside it ([`docs/api/local.md`](../api/local.md)). It is what a client of the HTTP API reads instead
+of the handlers — every route, its parameters and body, every answer with its status, and the
+refusals the gate, the chat's guard and the vault scoping give any route without the route saying so.
+
+| Where | Owns |
+|---|---|
+| `server/schema/fields.ts` | the registry; `field`, `kept`, `body`, `bodyThen` — how a body's field is read and described; the shared answers (`Refusal`, the 409's `Conflict`) |
+| `server/schema/row.ts` | a route's row, and `route()`, which adds the answers the server around it gives: `401 token`, the guard's `403`s and the cookie's `origin`, `404 vault` on a scoped route, `409 no-turn`, `500` |
+| `server/schema/{docs,folders,files,tags,vaults,meta,chat,cloud}.ts` · `shapes.ts` | each family's bodies, answers and rows · the answer shapes more than one family sends |
+| `server/openapi.ts` | `ROUTES`, and `localDocument(features)`: the `cloud` rows only when that switch is on |
+| `test/server/spec.ts` · `answers.setup.ts` · `openapi.test.ts` | an answer held to the document · that check on every app the unit suite makes · the contract |
+
+Load-bearing:
+
+- **A body is read through its schema** (`bodyAs` in `server/http.ts`), and **no route changed what
+  it accepts or answers**: a field's check moved from its handler into the schema with the handler's
+  own sentence and status (`field`'s `read`), declared in the order the handler checked, so the first
+  refusal is the one it was. Only a check made before the route touched anything moved; one made
+  after a read of the vault (a `404` first) stays after it, and its field is `kept` — described,
+  handed over as it came. So is a field the handler only coerces (`/__board/delete` echoes `name` as
+  sent). A body is an open object, as the handlers read it.
+- **`base` and the `409` are what they were.** `base` is read by `baseFrom`, absent or `null` "I have
+  not seen it", any other non-string a `400`; a stale one is still `{error, base, text}`, which every
+  row that writes under a `base` declares (`conflict`, `ConflictOrRefusal`).
+- **The table is held to the code three ways** (`test/server/openapi.test.ts`): every route `routes()`
+  registers is a row and every row a route; the same against `docs/parity.json`'s `rest` columns and
+  the source `scripts/parity.mjs` reads; and the document is valid OpenAPI 3.1 by the OpenAPI
+  Initiative's schema, its refs land, and its bytes are the committed ones.
+- **Every answer the unit suite records is held to the document.** `vitest.config.ts`'s
+  `setupFiles` wraps `createApp`, so every answer an app a test makes gives goes through
+  `test/server/spec.ts`: a status the row does not list, another media type, or a body its schema
+  refuses — every object closed, so an unnamed field fails too — fails the test that met it. The
+  gate's own answers (`401`, `421`, `400 path`) and the routes' `404` for a path no row has are held
+  to the gate's shape, not a row's; a stream and bytes to their status and type. The routes no other
+  test asks are asked in `openapi.test.ts`.
+- **A switch that is off leaves its routes out**: `GET /api/openapi.json` on a server with `cloud`
+  off has no sync, logs or feedback row, as those routes answer 404. The committed copy is `cloud` on.
+- **`info.version` is the document's**, not the app's: a release that changes no route changes no byte.
+
+Adding a route: a row in its family's `server/schema/` file (the body its handler reads through
+`bodyAs`, its answers, and the refusals it makes itself), a line in `docs/parity.json` and
+`npm run parity`, then `npm run openapi` and commit the two files in `docs/api/`. `check:openapi`
+and the contract test fail until each is done.
 
 ## The development server
 

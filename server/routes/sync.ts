@@ -11,17 +11,22 @@
 import type { Hono } from "hono";
 
 import type { Session } from "../context";
-import { bodyOf } from "../http";
+import { bodyAs } from "../http";
+import { LinkBody, PairBody, RevokeBody } from "../schema/cloud";
 import { devices, link, now, pair, remotes, revoke, unlink } from "../sync/link";
 
 export function syncRoutes(app: Hono, s: Session): void {
   app.get("/api/sync", (c) => c.json(s.sync.status(s.vault)));
 
-  app.post("/api/sync/pair", async (c) => c.json(await pair(s.sync, s.vault, await bodyOf(c))));
+  app.post("/api/sync/pair", async (c) =>
+    c.json(await pair(s.sync, s.vault, (await bodyAs(c, PairBody)) as Record<string, unknown>)),
+  );
 
   app.get("/api/sync/remotes", async (c) => c.json(await remotes(s.sync, s.vault)));
 
-  app.post("/api/sync/link", async (c) => c.json(await link(s.sync, s, s.vault, await bodyOf(c))));
+  app.post("/api/sync/link", async (c) =>
+    c.json(await link(s.sync, s, s.vault, (await bodyAs(c, LinkBody)) as Record<string, unknown>)),
+  );
 
   app.post("/api/sync/unlink", async (c) => c.json(await unlink(s.sync, s.vault)));
 
@@ -29,5 +34,5 @@ export function syncRoutes(app: Hono, s: Session): void {
 
   app.get("/api/sync/devices", async (c) => c.json(await devices(s.sync, s.vault)));
 
-  app.post("/api/sync/devices/revoke", async (c) => c.json(await revoke(s.sync, s.vault, (await bodyOf(c)).id)));
+  app.post("/api/sync/devices/revoke", async (c) => c.json(await revoke(s.sync, s.vault, (await bodyAs(c, RevokeBody)).id)));
 }

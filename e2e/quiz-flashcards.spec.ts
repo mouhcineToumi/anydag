@@ -74,14 +74,21 @@ async function open(field: Locator): Promise<void> {
   await expect(field.locator('[contenteditable="true"]')).toBeFocused();
 }
 
+/** Change a question's kind through the menu on its kind label. */
+async function setKind(card: Locator, kind: "one" | "several" | "written" | "card"): Promise<void> {
+  await card.locator("[data-dag-quiz-kind-button]").click();
+  await card.locator(`[data-dag-quiz-kind-option="${kind}"]`).click();
+}
+
 test("a flashcard added in the form is written with `card`, and no other byte moves", { tag: "@smoke" }, async ({ page }) => {
   const name = write("made", `---\ntitle: Cards\n---\n\n${CHOICE}`);
   await page.goto(`/?quiz=${name}`);
   await expect(page.locator("[data-dag-quiz-question]")).toHaveCount(1);
-  await page.locator("[data-dag-quiz-add-flashcard]").click();
+  await page.locator("[data-dag-quiz-add]").click();
+  await page.locator('[data-dag-quiz-add-kind="card"]').click();
   const added = page.locator("[data-dag-quiz-question]").last();
   await expect(added).toHaveAttribute("data-dag-quiz-kind", "card");
-  await expect(added.locator("[data-dag-quiz-kind-select]")).toHaveValue("card");
+  await expect(added.locator("[data-dag-quiz-kind-button]")).toHaveText("Flashcard");
   /* A card has a front and a back, and nothing to choose between. */
   await expect(added.locator("[data-dag-quiz-option-text]")).toHaveCount(0);
   await expect(added.locator("[data-dag-quiz-add-option]")).toHaveCount(0);
@@ -97,11 +104,11 @@ test("a flashcard added in the form is written with `card`, and no other byte mo
   await expect(added.locator("[data-dag-quiz-problem]")).toHaveCount(0);
 
   /* Answered in words, it is an open question: the same quote, `card` gone from the heading. */
-  await added.locator("[data-dag-quiz-kind-select]").selectOption("written");
+  await setKind(added, "written");
   await expect.poll(() => read("made")).toMatch(/\n## What is MVCC\? \{#q[0-9a-z]{6}\}\n\n> Multi-version/);
   await expect(added).toHaveAttribute("data-dag-quiz-kind", "written");
   /* And a flashcard again, with nothing asked: there were no answers to drop. */
-  await added.locator("[data-dag-quiz-kind-select]").selectOption("card");
+  await setKind(added, "card");
   await expect.poll(() => read("made")).toMatch(/\n## What is MVCC\? \{#q[0-9a-z]{6} card\}\n\n> Multi-version/);
 });
 
@@ -109,7 +116,7 @@ test("turning a question with answers into a flashcard asks before it drops them
   const name = write("turn", `---\ntitle: Cards\n---\n\n${CHOICE}`);
   await page.goto(`/?quiz=${name}`);
   const card = page.locator('[data-dag-quiz-question="qvis"]');
-  await card.locator("[data-dag-quiz-kind-select]").selectOption("card");
+  await setKind(card, "card");
   await expect(card.locator("[data-dag-quiz-drop-answers]")).toContainText("A flashcard");
   expect(read("turn")).toContain(CHOICE);
   await card.locator("[data-dag-quiz-drop-answers-yes]").click();

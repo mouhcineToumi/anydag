@@ -1,5 +1,21 @@
-import { ArrowDown, ArrowUp, Copy, GripVertical, Pin, Plus, Sparkles, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  CircleDot,
+  Copy,
+  GripVertical,
+  ListChecks,
+  PenLine,
+  Pin,
+  Plus,
+  Sparkles,
+  SquareStack,
+  Trash2,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { preloadFieldEditor } from "@/blocks";
 import { assertNever } from "@/board/useBoard";
@@ -24,12 +40,14 @@ import {
 } from "@/quiz/write";
 import { ownAssets } from "@/render/assets";
 import { useAi } from "@/settings/useAi";
+import { Button } from "@/ui/controls";
 import { startDrag } from "@/ui/pointerDrag";
 
 import { addCards } from "./generate";
 import { GenerateCards } from "./GenerateCards";
-import { said, fixLabel, type Fix, type Said } from "./problems";
-import { FieldHostContext, focusField, RichField, type FieldHost } from "./RichField";
+import { Menu } from "./Menu";
+import { blank, said, fixLabel, unfinished, type Fix, type Said } from "./problems";
+import { FieldHostContext, focusField, RichField, STILL_OURS, type FieldHost } from "./RichField";
 import { QuizMarkdown } from "./QuizMarkdown";
 
 /**
@@ -60,13 +78,61 @@ type Kind = "one" | "several" | "written" | "card";
 
 const kindOf = (q: Question): Kind => (q.card ? "card" : q.options.length === 0 ? "written" : q.multi ? "several" : "one");
 
-const KINDS: { kind: Kind; label: string }[] = [
-  { kind: "one", label: "One right answer" },
-  { kind: "several", label: "Several right answers" },
-  { kind: "written", label: "Answered in words" },
+/** The four kinds, each with what the learner does with one: the words on its tile (#257). */
+const KINDS: { kind: Kind; label: string; does: string; icon: LucideIcon }[] = [
+  { kind: "one", label: "One right answer", does: "They choose one of your answers.", icon: CircleDot },
+  { kind: "several", label: "Several right answers", does: "They tick every right one.", icon: ListChecks },
+  { kind: "written", label: "Answered in words", does: "They write, then compare with your answer.", icon: PenLine },
   /* A front and a back: no box to type in, the back shown, then whether they had it. */
-  { kind: "card", label: "Flashcard" },
+  { kind: "card", label: "Flashcard", does: "A front and a back. They say if they knew it.", icon: SquareStack },
 ];
+
+const KIND = Object.fromEntries(KINDS.map((k) => [k.kind, k])) as Record<Kind, (typeof KINDS)[number]>;
+
+function KindIcon({ kind }: { kind: Kind }) {
+  const Icon = KIND[kind].icon;
+  return <Icon className="dag-quiz__kind-icon" size={14} strokeWidth={2} aria-hidden="true" />;
+}
+
+/**
+ * One kind as a tile: its glyph, its name and what the learner does. The same tile is the empty
+ * quiz's way in, a row of *Add a question*'s menu, and a row of a question's kind menu — the words
+ * are the same everywhere a kind is chosen. A plain `<button>`, as DESIGN.md keeps the empty board's
+ * tiles: it has a line under its name.
+ */
+function KindTile({
+  kind,
+  role,
+  checked,
+  number,
+  onPick,
+  attrs,
+}: {
+  kind: Kind;
+  role?: "menuitem" | "menuitemradio";
+  checked?: boolean;
+  /** The key that picks it in a numbered menu. */
+  number?: number;
+  onPick(): void;
+  attrs?: Record<`data-${string}`, string>;
+}) {
+  const { label, does, icon: Icon } = KIND[kind];
+  return (
+    <button
+      type="button"
+      role={role}
+      aria-checked={role === "menuitemradio" ? !!checked : undefined}
+      className="dag-quiz__tile"
+      onClick={onPick}
+      {...attrs}
+    >
+      <Icon className="dag-quiz__tile-icon" size={16} strokeWidth={2} aria-hidden="true" />
+      <span className="dag-quiz__tile-name">{label}</span>
+      {number !== undefined ? <kbd className="dag-quiz__tile-key">{number}</kbd> : null}
+      <span className="dag-quiz__tile-does">{does}</span>
+    </button>
+  );
+}
 
 /** The kinds with no answers to choose from: a model answer, or a card's back. */
 const wordsOnly = (k: Kind): k is "written" | "card" => k === "written" || k === "card";
@@ -82,6 +148,53 @@ function problemsOf(diagnostics: QuizDiagnostic[], questions: Question[], i: num
  * Drag one of a list's rows to another place: a mark where it would land while it moves, and
  * `onDrop(to)` — the index it ends at, `splice`'s — on release. Pointer events, `startDrag`'s shape.
  */
+/** What the form's fields are called, for each kind: a flashcard has a front and a back. */
+interface FieldWords {
+  prompt: { label: string; note?: string; placeholder: string };
+  bodyNote: string;
+  why: { label: string; note: string; placeholder: string };
+}
+const CHOICE_WORDS: FieldWords = {
+  prompt: { label: "Question", placeholder: "What do you want to ask?" },
+  bodyNote: "optional, under the question",
+  why: { label: "Explanation", note: "optional, shown after they answer", placeholder: "Why the right answer is right" },
+};
+const WORDS: Record<Kind, FieldWords> = {
+  one: CHOICE_WORDS,
+  several: CHOICE_WORDS,
+  written: {
+    ...CHOICE_WORDS,
+    why: { label: "Model answer", note: "shown once they have written theirs", placeholder: "The answer you expect" },
+  },
+  card: {
+    prompt: { label: "Front", note: "what they see first", placeholder: "A question, a term, a prompt" },
+    bodyNote: "optional, on the front",
+    why: { label: "Back", note: "shown when they turn the card", placeholder: "The answer on the back" },
+  },
+};
+
+/**
+ * Why an answer keeps its place when the answers shuffle: pinned by hand, by its own words ("All of
+ * the above" speaks about the answers around it, `pinned`), or not at all. The pin's title and its
+ * `data-dag-quiz-pin` say which.
+ */
+type PinState = "hand" | "words" | "free";
+const PIN_TITLE: Record<PinState, string> = {
+  hand: "Keeps its place when the answers shuffle — click to let it move",
+  words: "Keeps its place: it speaks about the answers around it",
+  free: "Keep its place when the answers shuffle",
+};
+const PIN_ATTR: Record<PinState, string | undefined> = { hand: "", words: "words", free: undefined };
+function pinState(o: Question["options"][number]): PinState {
+  if (o.pin) return "hand";
+  return pinned(o) ? "words" : "free";
+}
+
+/** An answer's text field: `data-dag-quiz-wants` marks one left blank, which the form asks for. */
+function answerAttrs(blank: boolean): Record<string, string> {
+  return blank ? { "data-dag-quiz-option-text": "", "data-dag-quiz-wants": "" } : { "data-dag-quiz-option-text": "" };
+}
+
 function dragRow(e: ReactPointerEvent, row: HTMLElement | null, rows: () => HTMLElement[], onDrop: (to: number) => void): void {
   if (!row) return;
   e.preventDefault();
@@ -129,6 +242,7 @@ function ProblemList({
   onStray,
   stray,
   name,
+  title,
 }: {
   list: Said[];
   onFix(fix: Fix): void;
@@ -137,46 +251,51 @@ function ProblemList({
   /** A stray's text, shown under its problem. */
   stray?: string;
   name: string;
+  /** Said above the list: what the problems add up to. */
+  title?: string;
 }) {
   if (list.length === 0) return null;
   return (
-    <ul className="dag-quiz__problems" data-dag-quiz-problems="">
-      {list.map((p, i) => {
-        const label = fixLabel(p.fix);
-        return (
-          <li key={i} className="dag-quiz__problem" data-dag-quiz-problem={p.code} data-severity={p.severity}>
-            <span className="dag-quiz__problem-words">{p.words}</span>
-            {label ? (
-              <button type="button" className="dag-quiz__fix" data-dag-quiz-fix={p.fix.kind} onClick={() => onFix(p.fix)}>
-                {label}
-              </button>
-            ) : null}
-            {p.fix.kind === "stray" ? (
-              <div className="dag-quiz__stray" data-dag-quiz-stray="">
-                {stray ? (
-                  <div className="dag-quiz__stray-text">
-                    <QuizMarkdown name={name} md={stray} />
+    <div className="dag-quiz__problems" data-dag-quiz-problems="">
+      {title ? <p className="dag-quiz__problems-title">{title}</p> : null}
+      <ul className="dag-quiz__problem-list">
+        {list.map((p, i) => {
+          const label = fixLabel(p.fix);
+          return (
+            <li key={i} className="dag-quiz__problem" data-dag-quiz-problem={p.code} data-severity={p.severity}>
+              <span className="dag-quiz__problem-words">{p.words}</span>
+              {label ? (
+                <button type="button" className="dag-quiz__fix" data-dag-quiz-fix={p.fix.kind} onClick={() => onFix(p.fix)}>
+                  {label}
+                </button>
+              ) : null}
+              {p.fix.kind === "stray" ? (
+                <div className="dag-quiz__stray" data-dag-quiz-stray="">
+                  {stray ? (
+                    <div className="dag-quiz__stray-text">
+                      <QuizMarkdown name={name} md={stray} />
+                    </div>
+                  ) : null}
+                  <div className="dag-quiz__stray-fixes">
+                    {STRAY_TO.map(({ to, label }) => (
+                      <button
+                        key={to}
+                        type="button"
+                        className="dag-quiz__fix"
+                        data-dag-quiz-stray-to={to}
+                        onClick={() => onStray?.(to)}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                ) : null}
-                <div className="dag-quiz__stray-fixes">
-                  {STRAY_TO.map(({ to, label }) => (
-                    <button
-                      key={to}
-                      type="button"
-                      className="dag-quiz__fix"
-                      data-dag-quiz-stray-to={to}
-                      onClick={() => onStray?.(to)}
-                    >
-                      {label}
-                    </button>
-                  ))}
                 </div>
-              </div>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -190,6 +309,14 @@ interface CardProps {
   focus: boolean;
   /** The quiz shuffles its options: each option offers to keep its place. */
   shuffle: boolean;
+  /**
+   * Blank, or being written: what it still lacks is not said (#257, rule 3) — not on a question
+   * nobody has written in, and not on one somebody is in the middle of. A problem with the file
+   * around it, which nothing typed into the card would fix, is said all the same.
+   */
+  quiet: boolean;
+  /** The focus or a press went into this card: it is the one being written. */
+  onEnter(): void;
   /** Why the last edit was not written, until the next one. */
   refused: string | null;
   onEdit(input: QuestionInput): void;
@@ -211,6 +338,8 @@ function QuestionCard({
   problems,
   focus,
   shuffle,
+  quiet,
+  onEnter,
   refused,
   onEdit,
   onMove,
@@ -239,10 +368,15 @@ function QuestionCard({
     setFresh(input.options.length);
   };
   const kind = kindOf(q);
+  const words = WORDS[kind];
   const shown = problems.flatMap((d) => {
     const s = said(d, q);
-    return s ? [s] : [];
+    return s && !(quiet && unfinished(s.code)) ? [s] : [];
   });
+  /* An empty answer the card says is empty: its slot is marked, so the words have a place to point. */
+  const emptyAnswers = new Set(
+    shown.flatMap((p) => (p.fix.kind === "focus" && p.fix.field === "option" ? [p.fix.option ?? 0] : [])),
+  );
   /* Something the form has no field for, or an identity two questions share: rewriting the card
      would drop the one or write the other question, so the card is read-only until it is fixed. */
   const held = shown.some((p) => p.fix.kind === "stray" || p.fix.kind === "reid");
@@ -315,6 +449,8 @@ function QuestionCard({
       data-dag-quiz-kind={kind}
       data-dag-quiz-needs-answer={needsAnswer ? "" : undefined}
       aria-label={`Question ${index + 1}`}
+      onFocusCapture={onEnter}
+      onPointerDownCapture={onEnter}
     >
       <header className="dag-quiz__card-head">
         <button
@@ -328,20 +464,38 @@ function QuestionCard({
           <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
         </button>
         <span className="dag-quiz__card-number">Question {index + 1}</span>
-        <select
-          className="dag-select dag-quiz__kind"
-          aria-label="Kind of question"
-          data-dag-quiz-kind-select=""
-          value={kind}
+        {/* The kind is changed here, on the question; *Add a question* is where one is chosen to begin with. */}
+        <Menu
+          label="Kind of question"
+          buttonClass="dag-quiz__kind"
+          buttonAttrs={{ "data-dag-quiz-kind-button": "", "aria-label": `Kind of question: ${KIND[kind].label}` }}
+          menuClass="dag-quiz__kinds dag-quiz__kinds--change"
+          menuAttrs={{ "data-dag-quiz-kind-menu": "" }}
           disabled={held}
-          onChange={(e) => setKind(e.target.value as Kind)}
+          button={
+            <>
+              <KindIcon kind={kind} />
+              {KIND[kind].label}
+              <ChevronDown className="dag-quiz__kind-chevron" size={14} strokeWidth={2} aria-hidden="true" />
+            </>
+          }
         >
-          {KINDS.map((k) => (
-            <option key={k.kind} value={k.kind}>
-              {k.label}
-            </option>
-          ))}
-        </select>
+          {(close) =>
+            KINDS.map((k) => (
+              <KindTile
+                key={k.kind}
+                kind={k.kind}
+                role="menuitemradio"
+                checked={k.kind === kind}
+                attrs={{ "data-dag-quiz-kind-option": k.kind }}
+                onPick={() => {
+                  close();
+                  setKind(k.kind);
+                }}
+              />
+            ))
+          }
+        </Menu>
         <span className="dag-quiz__card-tools">
           <button
             type="button"
@@ -419,7 +573,14 @@ function QuestionCard({
           </button>
         </p>
       ) : null}
-      <ProblemList list={shown} onFix={fix} onStray={(to) => onRepair({ kind: "stray", to })} stray={q.stray} name={name} />
+      <ProblemList
+        list={shown}
+        title={shown.some((p) => p.severity === "error") ? "Not ready to practise yet" : undefined}
+        onFix={fix}
+        onStray={(to) => onRepair({ kind: "stray", to })}
+        stray={q.stray}
+        name={name}
+      />
       {refused ? (
         <p className="dag-quiz__note" role="alert" data-dag-quiz-refused="">
           {refused}
@@ -427,8 +588,10 @@ function QuestionCard({
       ) : null}
       <RichField
         variant="line"
-        label={kind === "card" ? "Front" : "Question"}
-        placeholder={kind === "card" ? "The front: a question, a term, a prompt" : "What do you want to ask?"}
+        label={words.prompt.label}
+        shown
+        note={words.prompt.note}
+        placeholder={words.prompt.placeholder}
         md={q.prompt}
         readOnly={held}
         autoFocus={focus}
@@ -441,11 +604,9 @@ function QuestionCard({
         <RichField
           variant="block"
           label="Details"
-          placeholder={
-            kind === "card"
-              ? "More on the front: a code sample, a picture, an equation"
-              : "More to the question: a code sample, a picture, an equation"
-          }
+          shown
+          note={words.bodyNote}
+          placeholder="A code sample, a picture, an equation"
           md={q.body}
           readOnly={held}
           autoFocus={details && !q.body.trim()}
@@ -461,107 +622,109 @@ function QuestionCard({
           onClick={() => setDetails(true)}
         >
           <Plus size={14} strokeWidth={2} aria-hidden="true" />
-          Add details
+          Add details: code, a picture, an equation
         </button>
       )}
       {wordsOnly(kind) ? null : (
-        <div className="dag-quiz__options" role="list" aria-label="Answers" ref={optionList}>
-          {q.options.map((o, i) => (
-            <div
-              key={i}
-              className="dag-quiz__option"
-              role="listitem"
-              data-dag-quiz-option={i}
-              data-dag-quiz-correct={o.correct ? "" : undefined}
-            >
-              <button
-                type="button"
-                className="dag-icon dag-quiz__grip"
-                title="Drag to move"
-                aria-label={`Drag answer ${i + 1} to move it`}
-                disabled={held}
-                onPointerDown={(e) =>
-                  dragRow(
-                    e,
-                    e.currentTarget.closest<HTMLElement>(".dag-quiz__option"),
-                    () => Array.from(optionList.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__option") ?? []),
-                    (to) => moveOption(i, to),
-                  )
-                }
+        <>
+          <div className="dag-quiz__label" aria-hidden="true">
+            Answers
+            <span className="dag-quiz__label-note"> · {kind === "one" ? "tick the right one" : "tick every right one"}</span>
+          </div>
+          <div className="dag-quiz__options" role="list" aria-label="Answers" ref={optionList}>
+            {q.options.map((o, i) => (
+              <div
+                key={i}
+                className="dag-quiz__option"
+                role="listitem"
+                data-dag-quiz-option={i}
+                data-dag-quiz-correct={o.correct ? "" : undefined}
               >
-                <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
-              </button>
-              <input
-                type={kind === "one" ? "radio" : "checkbox"}
-                className={kind === "one" ? "dag-check dag-check--round" : "dag-check"}
-                name={kind === "one" ? `correct-${q.id ?? q.line}` : undefined}
-                checked={o.correct}
-                disabled={held}
-                aria-label={`Answer ${i + 1} is right`}
-                title="The right answer"
-                data-dag-quiz-correct-toggle=""
-                onChange={(e) => choose(i, e.target.checked)}
-              />
-              <RichField
-                variant="block"
-                label={`Answer ${i + 1}`}
-                placeholder={o.correct ? "A right answer" : "A wrong answer"}
-                md={o.text}
-                readOnly={held}
-                autoFocus={fresh === i}
-                className="dag-quiz__option-text"
-                attrs={{ "data-dag-quiz-option-text": "" }}
-                onCommit={(text) => setOption(i, { text })}
-              />
-              {shuffle ? (
                 <button
                   type="button"
-                  className="dag-icon dag-quiz__pin"
-                  aria-pressed={pinned(o)}
-                  disabled={held || (!o.pin && pinned(o))}
-                  title={
-                    o.pin
-                      ? "Keeps its place when the answers shuffle — click to let it move"
-                      : pinned(o)
-                        ? "Keeps its place: it speaks about the answers around it"
-                        : "Keep its place when the answers shuffle"
+                  className="dag-icon dag-quiz__grip"
+                  title="Drag to move"
+                  aria-label={`Drag answer ${i + 1} to move it`}
+                  disabled={held}
+                  onPointerDown={(e) =>
+                    dragRow(
+                      e,
+                      e.currentTarget.closest<HTMLElement>(".dag-quiz__option"),
+                      () => Array.from(optionList.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__option") ?? []),
+                      (to) => moveOption(i, to),
+                    )
                   }
-                  aria-label={`Keep answer ${i + 1} in its place`}
-                  data-dag-quiz-pin={o.pin ? "" : pinned(o) ? "words" : undefined}
-                  onClick={() => setOption(i, { pin: !o.pin })}
                 >
-                  <Pin size={14} strokeWidth={2} aria-hidden="true" />
+                  <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
                 </button>
-              ) : null}
-              <button
-                type="button"
-                className="dag-icon"
-                title="Remove answer"
-                aria-label={`Remove answer ${i + 1}`}
-                data-dag-quiz-remove-option=""
-                disabled={held}
-                onClick={() => onEdit({ ...input, options: input.options.filter((_, k) => k !== i) })}
-              >
-                <X size={14} strokeWidth={2} aria-hidden="true" />
-              </button>
-            </div>
-          ))}
-          <button type="button" className="dag-quiz__add-option" data-dag-quiz-add-option="" disabled={held} onClick={addOption}>
-            <Plus size={14} strokeWidth={2} aria-hidden="true" />
-            Add an answer
-          </button>
-        </div>
+                <input
+                  type={kind === "one" ? "radio" : "checkbox"}
+                  className={kind === "one" ? "dag-check dag-check--round" : "dag-check"}
+                  name={kind === "one" ? `correct-${q.id ?? q.line}` : undefined}
+                  checked={o.correct}
+                  disabled={held}
+                  aria-label={`Answer ${i + 1} is right`}
+                  title="The right answer"
+                  data-dag-quiz-correct-toggle=""
+                  onChange={(e) => choose(i, e.target.checked)}
+                />
+                <RichField
+                  variant="block"
+                  label={`Answer ${i + 1}`}
+                  placeholder={i === 0 ? "An answer" : "Another answer"}
+                  md={o.text}
+                  readOnly={held}
+                  autoFocus={fresh === i}
+                  className="dag-quiz__option-text"
+                  attrs={answerAttrs(emptyAnswers.has(i))}
+                  onCommit={(text) => setOption(i, { text })}
+                />
+                {shuffle ? (
+                  <button
+                    type="button"
+                    className="dag-icon dag-quiz__pin"
+                    aria-pressed={pinned(o)}
+                    disabled={held || (!o.pin && pinned(o))}
+                    title={PIN_TITLE[pinState(o)]}
+                    aria-label={`Keep answer ${i + 1} in its place`}
+                    data-dag-quiz-pin={PIN_ATTR[pinState(o)]}
+                    onClick={() => setOption(i, { pin: !o.pin })}
+                  >
+                    <Pin size={14} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="dag-icon"
+                  title="Remove answer"
+                  aria-label={`Remove answer ${i + 1}`}
+                  data-dag-quiz-remove-option=""
+                  disabled={held}
+                  onClick={() => onEdit({ ...input, options: input.options.filter((_, k) => k !== i) })}
+                >
+                  <X size={14} strokeWidth={2} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="dag-quiz__add-option"
+              data-dag-quiz-add-option=""
+              disabled={held}
+              onClick={addOption}
+            >
+              <Plus size={14} strokeWidth={2} aria-hidden="true" />
+              Add an answer
+            </button>
+          </div>
+        </>
       )}
       <RichField
         variant="block"
-        label={kind === "card" ? "Back" : kind === "written" ? "Model answer" : "Explanation"}
-        placeholder={
-          kind === "card"
-            ? "The back: the answer, shown once they have thought of theirs"
-            : kind === "written"
-              ? "The answer, shown once they have written theirs"
-              : "Why the answer is right, shown after answering (optional)"
-        }
+        label={words.why.label}
+        shown
+        note={words.why.note}
+        placeholder={words.why.placeholder}
         md={q.why}
         readOnly={held}
         attrs={{ "data-dag-quiz-why": "" }}
@@ -619,6 +782,46 @@ export function QuizEditor({
    */
   const aliases = useRef(new Map<string, string>());
   const keyOf = (q: Question) => (q.id !== undefined ? (aliases.current.get(q.id) ?? q.id) : `line-${q.line}`);
+
+  /*
+   * **When a question is said to be unfinished** (#257, rule 3): once the focus leaves it with
+   * something written in it, or straight away when the page opens on one already partly written. A
+   * question with nothing in it never is. So a card the focus enters while it is blank is `quiet`
+   * — what it lacks goes unsaid while somebody writes it — and it stops being quiet when the focus
+   * or a press goes anywhere else. Kept by the card's React key, which a minted id does not change.
+   */
+  const [quiet, setQuiet] = useState<ReadonlySet<string>>(() => new Set());
+  const active = useRef<string | null>(null);
+  const byKey = useRef(new Map<string, Question>());
+  const enter = useCallback((key: string | null) => {
+    const was = active.current;
+    if (key === was) return;
+    active.current = key;
+    const q = key === null ? undefined : byKey.current.get(key);
+    const start = key !== null && q !== undefined && blank(q);
+    setQuiet((prev) => {
+      if (!(was !== null && prev.has(was)) && !start) return prev;
+      const next = new Set(prev);
+      if (was !== null) next.delete(was);
+      if (start) next.add(key);
+      return next;
+    });
+  }, []);
+  /* A press or a focus outside every card leaves the one that was being written. A field's own
+     menus and toolbars are portalled out of the card, and are still the field's. */
+  useEffect(() => {
+    const away = (e: Event) => {
+      const t = e.target;
+      if (!(t instanceof Element) || t.closest(".dag-quiz__card") || t.closest(STILL_OURS)) return;
+      enter(null);
+    };
+    document.addEventListener("pointerdown", away, true);
+    document.addEventListener("focusin", away, true);
+    return () => {
+      document.removeEventListener("pointerdown", away, true);
+      document.removeEventListener("focusin", away, true);
+    };
+  }, [enter]);
 
   useEffect(() => {
     void preloadFieldEditor();
@@ -693,20 +896,25 @@ export function QuizEditor({
 
   const idAt = (qs: Question[], i: number) => qs[i]!.id!;
 
-  /** A question at the end: two answers to fill in, or none — answered in words, or a flashcard. */
-  const add = (kind: "choice" | "written" | "card" = "choice") => {
+  /**
+   * A question of `kind` at the end, written the moment its kind is chosen and not before (#257,
+   * decision 2): an Add abandoned writes nothing. Two answers to fill in, neither ticked — a tick
+   * already on the first left people wondering why it was green — or none, answered in words or a
+   * flashcard.
+   */
+  const add = (kind: Kind) => {
     const id = mintQuestionId(new Set(quiz.questions.flatMap((q) => (q.id ? [q.id] : []))));
     write(null, (t) =>
       addQuestion(t, {
         id,
         prompt: "",
-        options:
-          kind === "choice"
-            ? [
-                { text: "", correct: true },
-                { text: "", correct: false },
-              ]
-            : [],
+        options: wordsOnly(kind)
+          ? []
+          : [
+              { text: "", correct: false },
+              { text: "", correct: false },
+            ],
+        ...(kind === "several" ? { multi: true } : {}),
         ...(kind === "card" ? { card: true } : {}),
       }),
     );
@@ -719,6 +927,8 @@ export function QuizEditor({
     return s ? [s] : [];
   });
   const cards = () => Array.from(list.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__card") ?? []);
+  /* Which question each card is, for `enter`: drawn afresh with the cards below. */
+  byKey.current.clear();
 
   return (
     <FieldHostContext.Provider value={host}>
@@ -727,7 +937,9 @@ export function QuizEditor({
         <RichField
           variant="block"
           label="Description"
-          placeholder="What this quiz is about (optional)"
+          shown
+          note="optional, shown beside each question in a run"
+          placeholder="What this quiz is about"
           md={quiz.description}
           className="dag-quiz__description"
           attrs={{ "data-dag-quiz-description": "" }}
@@ -752,12 +964,37 @@ export function QuizEditor({
             if (f.kind === "close-fence") onChange(closeFence(text, f.line));
           }}
         />
-        {quiz.questions.length === 0 ? <p className="dag-quiz__empty">No questions yet.</p> : null}
+        {quiz.questions.length === 0 ? (
+          /* An empty quiz opens on the choice itself: the four kinds, each saying what the learner does. */
+          <section className="dag-quiz__first" data-dag-quiz-first="" aria-labelledby="dag-quiz-first-title">
+            <h2 className="dag-quiz__first-title" id="dag-quiz-first-title">
+              Add the first question
+            </h2>
+            <p className="dag-quiz__first-hint">Choose what the learner will do. You can change it later.</p>
+            <div className="dag-quiz__first-kinds">
+              {KINDS.map((k) => (
+                <KindTile key={k.kind} kind={k.kind} attrs={{ "data-dag-quiz-add-kind": k.kind }} onPick={() => add(k.kind)} />
+              ))}
+            </div>
+            {flashcards ? (
+              <Button
+                variant="quiet"
+                className="dag-quiz__first-generate"
+                data-dag-quiz-generate=""
+                onClick={() => setGenerating(true)}
+              >
+                <Sparkles size={14} strokeWidth={2} aria-hidden="true" />
+                Or generate flashcards from a topic or a note
+              </Button>
+            ) : null}
+          </section>
+        ) : null}
         <div className="dag-quiz__list" ref={list}>
           {quiz.questions.map((q, i) => {
             /* The second of two sharing an id is keyed by its line, so React keeps two cards apart. */
             const shared = q.id !== undefined && quiz.questions.findIndex((x) => x.id === q.id) !== i;
             const key = shared ? `line-${q.line}` : keyOf(q);
+            byKey.current.set(key, q);
             return (
               <QuestionCard
                 key={key}
@@ -768,6 +1005,8 @@ export function QuizEditor({
                 problems={problemsOf(quiz.diagnostics, quiz.questions, i)}
                 focus={q.id !== undefined && q.id === focus}
                 shuffle={quiz.shuffle}
+                quiet={blank(q) || quiet.has(key)}
+                onEnter={() => enter(key)}
                 refused={refused?.key === key ? refused.why : null}
                 onEdit={(input) => write(key, (t, qs) => replaceQuestion(t, idAt(qs, i), { ...input, id: idAt(qs, i) }))}
                 onMove={(to) => write(null, (t) => atQuestion(t, i, (u, id) => moveQuestion(u, id, to)))}
@@ -804,44 +1043,47 @@ export function QuizEditor({
             );
           })}
         </div>
-        <div className="dag-quiz__adds">
-          <button type="button" className="dag-quiz__add" data-dag-quiz-add="" onClick={() => add()}>
-            <Plus size={16} strokeWidth={2} aria-hidden="true" />
-            {quiz.questions.length === 0 ? "Add the first question" : "Add a question"}
-          </button>
-          <button
-            type="button"
-            className="dag-quiz__add"
-            data-dag-quiz-add-open=""
-            title="A question answered in words, compared with a model answer"
-            onClick={() => add("written")}
-          >
-            <Plus size={16} strokeWidth={2} aria-hidden="true" />
-            Add a question answered in words
-          </button>
-          <button
-            type="button"
-            className="dag-quiz__add"
-            data-dag-quiz-add-flashcard=""
-            title="A front and a back: think of the answer, show the back, say whether you had it"
-            onClick={() => add("card")}
-          >
-            <Plus size={16} strokeWidth={2} aria-hidden="true" />
-            Add a flashcard
-          </button>
-          {flashcards ? (
-            <button
-              type="button"
-              className="dag-quiz__add"
-              data-dag-quiz-generate=""
-              title="A model writes flashcards from a topic or a note; you choose which to keep"
-              onClick={() => setGenerating(true)}
+        {quiz.questions.length > 0 ? (
+          /* Two ways to add, and no more: the kind is chosen in the menu, where it says what each is. */
+          <div className="dag-quiz__adds">
+            <Menu
+              label="Kind of question"
+              buttonClass="dag-quiz__add"
+              buttonAttrs={{ "data-dag-quiz-add": "" }}
+              menuClass="dag-quiz__kinds"
+              menuAttrs={{ "data-dag-quiz-add-menu": "" }}
+              numbered
+              button={
+                <>
+                  <Plus size={16} strokeWidth={2} aria-hidden="true" />
+                  Add a question
+                </>
+              }
             >
-              <Sparkles size={16} strokeWidth={2} aria-hidden="true" />
-              Generate flashcards
-            </button>
-          ) : null}
-        </div>
+              {(close) =>
+                KINDS.map((k, n) => (
+                  <KindTile
+                    key={k.kind}
+                    kind={k.kind}
+                    role="menuitem"
+                    number={n + 1}
+                    attrs={{ "data-dag-quiz-add-kind": k.kind }}
+                    onPick={() => {
+                      close();
+                      add(k.kind);
+                    }}
+                  />
+                ))
+              }
+            </Menu>
+            {flashcards ? (
+              <button type="button" className="dag-quiz__add" data-dag-quiz-generate="" onClick={() => setGenerating(true)}>
+                <Sparkles size={16} strokeWidth={2} aria-hidden="true" />
+                Generate flashcards
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {generating ? (
           <GenerateCards
             name={name}

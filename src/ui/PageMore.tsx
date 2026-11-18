@@ -1,7 +1,8 @@
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent as KeyEvent } from "react";
+import { useEffect, type KeyboardEvent as KeyEvent } from "react";
 
 import { IconButton } from "@/ui/controls";
+import { nextRow, useMenuCard } from "@/ui/menuCard";
 
 /**
  * One row of the top bar's `⋯`.
@@ -38,29 +39,7 @@ const ICON = { size: 16, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin:
  * arrows, which is the WAI menu pattern the sidebar's menus follow.
  */
 export function PageMore({ items }: { items: MoreItem[] }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const toggle = useRef<HTMLButtonElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setOpen(false);
-      toggle.current?.focus();
-    };
-    addEventListener("pointerdown", away);
-    addEventListener("keydown", esc, true);
-    return () => {
-      removeEventListener("pointerdown", away);
-      removeEventListener("keydown", esc, true);
-    };
-  }, [open]);
+  const { open, setOpen, box, toggle, menu } = useMenuCard();
 
   useEffect(() => {
     if (!open) return;
@@ -74,19 +53,12 @@ export function PageMore({ items }: { items: MoreItem[] }) {
   const narrowOnly = items.every((i) => i.narrow);
 
   const onMenuKey = (e: KeyEvent) => {
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
     const rows = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []).filter(
       (b) => b.offsetParent !== null,
     );
-    if (rows.length === 0) return;
+    const next = nextRow(rows, e.key);
+    if (next === null) return;
     e.preventDefault();
-    const at = rows.indexOf(document.activeElement as HTMLButtonElement);
-    const next =
-      e.key === "Home"
-        ? 0
-        : e.key === "End"
-          ? rows.length - 1
-          : (at + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length;
     rows[next]?.focus();
   };
 

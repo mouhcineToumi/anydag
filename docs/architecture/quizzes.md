@@ -45,7 +45,7 @@ quiz file, and a question leaves Mistakes after N right answers in a row inside 
 | the sidebar | **Quizzes** (with the Mistakes count) opens the Quizzes page; **New** → *Quiz* makes `untitled` titled *Untitled* with no questions and names it in the top bar; a quiz's row wears a cap |
 | the Quizzes page, `?quizzes=1` | Mistakes first, then a card per quiz — questions, how many in Mistakes, Practice — a filter, a folder (with *Practice the folder* once one is chosen), and a box that makes a quiz named after what is typed |
 | a folder's menu in the sidebar | *Practice the quizzes*, when anything under it is a quiz |
-| a quiz's page, `?quiz=` | a quiz builder, with no Markdown on it and no Source tab: a card per question — a grip to drag it, its kind (*One right answer*, *Several right answers*, *Answered in words*, *Flashcard* — a Front and a Back), the question as one rich line, *Add details*, the answers as rows (a grip, a round tick or a box, rich text, a pin while *Shuffle the options* is on), the explanation or model answer; what is wrong said in words on its card, each with a button that fixes it; *Add a flashcard* beside the other two adds, and *Generate flashcards*, which asks a model for cards from a topic or a note and writes the ones kept; Practice, Export (the file) |
+| a quiz's page, `?quiz=` | a quiz builder, with no Markdown on it and no Source tab: a card per question — a grip to drag it, its kind as a menu on its label (*One right answer*, *Several right answers*, *Answered in words*, *Flashcard* — a Front and a Back), the question as one rich line, *Add details*, the answers as rows (a grip, a round tick or a box, rich text, a pin while *Shuffle the options* is on), the explanation or model answer; every field named above it, filled or not, and an empty one drawn as a dashed slot; what a question still lacks said in words on its card once it is left unfinished (never on a blank one), each with a button that fixes it; *Add a question*, a menu of the four kinds, each saying what the learner does (an empty quiz shows them as tiles), and *Generate flashcards*, which asks a model for cards from a topic or a note and writes the ones kept; Practice, Export (the file) |
 | a run, `&run=1` · `?quizzes=1&run=mistakes` · `?quizzes=1&run=folder:<path>` | one question at a time, `1`–`9` to pick and Enter to go on, ← → or Previous and Next to move without answering, the quiz's description beside it; an open question's box, ctrl+Enter to see the model answer and `1`/`2` to say whether it was had; a flashcard's front with no box, Space or Enter to see the back, and the same `1`/`2`; the end says the score, what was skipped and what went into Mistakes |
 | a board, or a note, embedding one | a card: the title, the questions, how many in Mistakes, Practice |
 | `?view=1` | a run that records nothing |
@@ -100,7 +100,12 @@ Sixteen things are load-bearing:
   syntax. Each fix is a one-span writer: `resolveStray` (text after the answer becomes part of it,
   the question's details, or goes), `reidQuestion` (by index, since two share the id),
   `cleanHeading` (a setting the app does not know) and `closeFence` (a block left open swallowed the
-  questions after it). A card holding text the form has no field for (`Question.stray`) is read-only
+  questions after it). **What a question still lacks waits until it is left unfinished** (#257): a
+  code `unfinished()` names (no prompt, no answers, an empty one, none ticked, no back) is quiet on
+  a question nobody has written in (`blank()`, never flagged, even after a reload) and on the card
+  the focus entered while it was blank, until a press or the focus goes elsewhere; a page opened on
+  a partly written question says it at once. The rest — a stray, a shared id, an unknown setting, an
+  open fence — is said at once, since nothing typed into the card fixes it. A card holding text the form has no field for (`Question.stray`) is read-only
   until that text has a place, so an edit cannot rewrite it away. A write that would change the
   shape of the question list other than as asked is refused on its card.
 - **A question in a run is answered once, and a skip is no answer** (`src/ui/quiz/round.ts`).
@@ -165,8 +170,12 @@ and `run` — and `dag-run__option--block`, `dag-run__option-text--block`,
 `dag-quiz__option-text`, `dag-quiz__pin`, `dag-quiz__shuffle`, `dag-quiz__adds`,
 `dag-quizzes__practice-folder`, `dag-quizzes__count`, `data-dag-run-place`, `data-dag-run-open`,
 `data-dag-run-answer`, `data-dag-run-reveal`, `data-dag-run-judge`, `data-dag-run-model`,
-`data-dag-quiz-open`, `data-dag-quiz-pin`, `data-dag-quiz-shuffle`, `data-dag-quiz-add-open`,
+`data-dag-quiz-open`, `data-dag-quiz-pin`, `data-dag-quiz-shuffle`,
 `data-dag-quiz-sheet-open`, `data-dag-quizzes-practice-folder`, and the menu pick `practise` — and,
+for the builder's kinds and labels (#257), `dag-quiz__label*`, `dag-quiz__menu*`, `dag-quiz__kinds*`,
+`dag-quiz__kind-*`, `dag-quiz__tile*`, `dag-quiz__first*`, `dag-quiz__problems-title`,
+`dag-quiz__problem-list`, `data-dag-quiz-add-menu`, `data-dag-quiz-add-kind`, `data-dag-quiz-first`,
+`data-dag-quiz-empty`, `data-dag-quiz-wants` — and,
 for the builder, `dag-rich-field*` (not `dag-field`, the panel's labels), `dag-blocks--field`,
 `data-dag-field-editor`, `dag-quiz__rich*`, `dag-quiz__placeholder`, `dag-quiz__grip`,
 `dag-quiz__kind`, `dag-quiz__more`, `dag-quiz__fix`, `dag-quiz__stray*`, `dag-quiz__list`,
@@ -174,7 +183,7 @@ for the builder, `dag-rich-field*` (not `dag-field`, the panel's labels), `dag-b
 `data-dag-quiz-open-field`, `data-dag-quiz-kind*`, `data-dag-quiz-grip`, `data-dag-quiz-dragging`,
 `data-dag-quiz-drop`, `data-dag-quiz-fix`, `data-dag-quiz-stray*`, `data-dag-quiz-refused`,
 `data-dag-quiz-needs-answer`, `data-dag-quiz-add-details` and `data-dag-quiz-drop-answers*` — and, for
-flashcards, `data-dag-quiz-add-flashcard`, `data-dag-run-flashcard`, `data-dag-run-flashcard-tag`,
+flashcards, `data-dag-run-flashcard`, `data-dag-run-flashcard-tag`,
 `dag-run__flashcard-tag` and `data-dag-quiz-sheet-flashcard` — and, for generating them,
 `data-dag-quiz-generate`, `dag-flashcards*` and `data-dag-flashcards*`. "Card" was taken three times over (the
 form's `dag-quiz__card`, the Quizzes page's `dag-quizzes__card`, an embed's card), which is why every
@@ -182,6 +191,8 @@ name for a flashcard says `flashcard`.
 Retired with the Source tab: `dag:quiz-mode`, `data-dag-quiz-mode`, `data-dag-quiz-source`,
 `data-dag-quiz-multi`, `dag-quiz__mode`, `dag-quiz__source*`, `dag-quiz__field` and
 `dag-quiz__problem-line`.
+Retired with the four add buttons and the kind `<select>` (#257): `data-dag-quiz-add-open`,
+`data-dag-quiz-add-flashcard`, `data-dag-quiz-kind-select` and `dag-quiz__empty`.
 
 **Generating flashcards was out, and is in (#140).** It was left out because an agent already writes
 a quiz — `quiz_create`, `quiz_write`, `quiz_question_set` — and that is still true. But it answers

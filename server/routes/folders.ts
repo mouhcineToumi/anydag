@@ -3,18 +3,15 @@
 import type { Hono } from "hono";
 
 import type { Session } from "../context";
-import { bodyOf, err } from "../http";
-import { folderFrom, folderMove } from "../names";
+import { bodyAs, err } from "../http";
+import { MkdirBody, MvdirBody, RmdirBody } from "../schema/folders";
 import { trashAnswer, trashDays } from "../trash";
 import { relinking } from "../relink";
 import { NotFound, Refused } from "../vault";
 
 export function folderRoutes(app: Hono, s: Session): void {
   app.post("/__board/mkdir", async (c) => {
-    const body = await bodyOf(c);
-    const stem = folderFrom(body.name);
-    if (stem === null) throw err(400, `\`${String(body.name)}\` is not a folder name`);
-    if (!stem) throw err(400, "expected `name`");
+    const { name: stem } = await bodyAs(c, MkdirBody);
     try {
       return c.json({ folder: await s.vault.mkdir(stem) });
     } catch (e) {
@@ -24,9 +21,8 @@ export function folderRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/__board/rmdir", async (c) => {
-    const body = await bodyOf(c);
-    const stem = folderFrom(body.name);
-    if (!stem) throw err(400, "expected `name`");
+    const body = await bodyAs(c, RmdirBody);
+    const stem = body.name;
     try {
       // To the trash, as one entry; empty only unless `recursive: true`, the boolean.
       const entry = await s.vault.trashFolder(stem, body.recursive === true);
@@ -39,9 +35,7 @@ export function folderRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/__board/mvdir", async (c) => {
-    const body = await bodyOf(c);
-    const ends = folderMove(body.name, body.to);
-    if (typeof ends === "string") throw err(400, ends);
+    const { ends } = await bodyAs(c, MvdirBody);
     try {
       // Everything under the folder has a new name: the links to all of it are kept (`server/relink.ts`).
       const { result: folder, relinked } = await relinking(s, () => s.vault.moveFolder(...ends));

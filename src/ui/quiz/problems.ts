@@ -68,6 +68,40 @@ export function said(d: QuizDiagnostic, q?: Question): Said | null {
   }
 }
 
+/**
+ * Whether a code says a question is not finished yet — something still to write or to tick — as
+ * against something wrong with the file around it. The first kind is quiet on a question being
+ * written (#257); the second is said at once, because nothing typed into the card will fix it.
+ */
+export function unfinished(code: QuizDiagnostic["code"]): boolean {
+  switch (code) {
+    case "EQ_NO_PROMPT":
+    case "EQ_NO_OPTIONS":
+    case "EQ_ONE_OPTION":
+    case "EQ_NO_ANSWER":
+    case "EQ_EMPTY_OPTION":
+      return true;
+    case "EQ_STRAY":
+    case "EQ_DUPLICATE_ID":
+    case "WQ_UNKNOWN_ATTR":
+    case "WQ_OPEN_FENCE":
+    case "WQ_EMPTY":
+    case "WQ_NO_ID":
+      return false;
+    default:
+      return assertNever(code);
+  }
+}
+
+/**
+ * A question nobody has written anything in: no words in any field, whatever its kind and ticks.
+ * It is never said to be unfinished — not while it is new, not after a reload — and Practice leaves
+ * it out as it leaves out any question it cannot ask (#257, rule 3).
+ */
+export function blank(q: Question): boolean {
+  return !q.prompt.trim() && !q.body.trim() && !q.why.trim() && !q.stray?.trim() && q.options.every((o) => !o.text.trim());
+}
+
 /** The label on a fix's button, for the fixes that are a button. */
 export function fixLabel(fix: Fix): string | null {
   switch (fix.kind) {

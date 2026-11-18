@@ -19,15 +19,21 @@ import type { Session } from "../context";
 import { features } from "../features";
 import { zoneIn } from "../frontmatter";
 import { grammar } from "../grammar";
-import { bodyOf, err } from "../http";
+import { bodyAs, err } from "../http";
 import { validId } from "../ids";
-import { aliveOf, answersOf, counts, graduateOf, GRADUATE_MAX, GRADUATE_MIN, pool, PracticeRefused, statsOf } from "../practice";
-import { readPrefs, SETTINGS_MAX, writePrefs, type Scope } from "./prefs";
-
-/** A window's tabs, saved: a few hundred tabs' places is far less. */
-const TABS_MAX = 64 * 1024;
-/** The Graph page's view, saved: a few rules and six sliders, with room for a long list of hidden values. */
-const GRAPH_VIEW_MAX = 32 * 1024;
+import { localDocument } from "../openapi";
+import { aliveOf, counts, pool, statsOf } from "../practice";
+import {
+  ComponentDeleteBody,
+  GenerateBody,
+  GraduateBody,
+  GraphViewBody,
+  LlmTestBody,
+  PracticeBody,
+  SettingsBody,
+  TabsBody,
+} from "../schema/meta";
+import { readPrefs, writePrefs, type Scope } from "./prefs";
 
 const PROMPT_MAX = 4000;
 const SOURCE_MAX = 16000;
@@ -80,17 +86,18 @@ export function metaRoutes(app: Hono, s: Session): void {
     c.json({ account: LOCAL_ACCOUNT, zone: (s.any ? zoneIn(readPrefs(s, "vault")) : null) ?? zoneIn(readPrefs(s, "app")) }),
   );
 
+  /* This server's OpenAPI document (`server/openapi.ts`), for the switches this build runs with: a
+     route the `cloud` switch leaves out is not in it, as it is not registered. */
+  app.get("/api/openapi.json", (c) => c.json(localDocument(features(s.env))));
+
   /* -- preferences ------------------------------------------------------------------------- */
 
   const prefs = (scope: Scope) => {
     const at = scope === "app" ? "/api/settings" : "/api/vault/settings";
     app.get(at, (c) => c.json({ settings: readPrefs(s, scope) }));
     app.put(at, async (c) => {
-      const body = await bodyOf(c);
-      const value = body.settings;
-      if (!value || typeof value !== "object" || Array.isArray(value)) throw err(400, "expected `settings` to be an object");
-      if (JSON.stringify(value).length > SETTINGS_MAX) throw err(413, `settings are at most ${SETTINGS_MAX} bytes`);
-      writePrefs(s, scope, value as Record<string, unknown>);
+      const { settings: value } = await bodyAs(c, SettingsBody);
+      writePrefs(s, scope, value);
       // The attachments folder is read when a vault opens; a changed `dag:attachments` takes effect now.
       if (scope === "vault") s.reconfigure(s.vault);
       return c.json({ settings: value });
@@ -117,16 +124,12 @@ export function metaRoutes(app: Hono, s: Session): void {
     return c.json({ tabs });
   });
   app.put("/api/tabs", async (c) => {
-    const body = await bodyOf(c);
-    const value = body.tabs;
+    const { tabs: value } = await bodyAs(c, TabsBody);
     if (value === null) {
       s.home.set(tabsKey(), null);
       return c.json({ tabs: null });
     }
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw err(400, "expected `tabs` to be an object or null");
-    const text = JSON.stringify(value);
-    if (text.length > TABS_MAX) throw err(413, `tabs are at most ${TABS_MAX} bytes`);
-    s.home.set(tabsKey(), text);
+    s.home.set(tabsKey(), JSON.stringify(value));
     return c.json({ tabs: value });
   });
 
@@ -147,16 +150,12 @@ export function metaRoutes(app: Hono, s: Session): void {
     return c.json({ view });
   });
   app.put("/api/graph-view", async (c) => {
-    const body = await bodyOf(c);
-    const value = body.view;
+    const { view: value } = await bodyAs(c, GraphViewBody);
     if (value === null) {
       s.home.set(graphViewKey(), null);
       return c.json({ view: null });
     }
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw err(400, "expected `view` to be an object or null");
-    const text = JSON.stringify(value);
-    if (text.length > GRAPH_VIEW_MAX) throw err(413, `the graph's view is at most ${GRAPH_VIEW_MAX} bytes`);
-    s.home.set(graphViewKey(), text);
+    s.home.set(graphViewKey(), JSON.stringify(value));
     return c.json({ view: value });
   });
 
@@ -165,7 +164,7 @@ export function metaRoutes(app: Hono, s: Session): void {
   app.get("/__board/components", async (c) => c.json({ components: await savedComponents(s) }));
 
   app.post("/__board/components/delete", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, ComponentDeleteBody);
     const said = typeof body.name === "string" ? body.name.replace(/^components\//, "") : "";
     const full = `components/${said}`;
     if (!said || !(await s.vault.read(full, "board"))) throw err(404, `no component \`${String(body.name)}\``);
@@ -246,8 +245,7 @@ export function metaRoutes(app: Hono, s: Session): void {
    * a prompt card, with one attempt and thirty seconds.
    */
   app.post("/__board/llm/test", async (c) => {
-    const body = await bodyOf(c);
-    if (typeof body.provider !== "string" || !body.provider) throw err(400, "`provider` names the provider to test");
+    const body = await bodyAs(c, LlmTestBody);
     const started = Date.now();
     const resolved = resolveProvider(s.env, {
       provider: body.provider,
@@ -268,9 +266,8 @@ export function metaRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/__board/generate", async (c) => {
-    const body = await bodyOf(c);
-    const kind = body.kind ?? "diagram";
-    if (kind !== "diagram" && kind !== "flashcards") throw err(400, "`kind` is `diagram` or `flashcards`");
+    const body = await bodyAs(c, GenerateBody);
+    const kind = body.kind;
 
     if (kind === "flashcards") {
       /* Flashcards for a quiz (#140): from a topic, from a note's text, or from a note with what to
@@ -347,14 +344,7 @@ export function metaRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/api/practice", async (c) => {
-    const body = await bodyOf(c);
-    let answers;
-    try {
-      answers = answersOf(body.events);
-    } catch (e) {
-      if (e instanceof PracticeRefused) throw err(400, e.message);
-      throw e;
-    }
+    const { events: answers } = await bodyAs(c, PracticeBody);
     if (!answers.length) return c.json({ stats: {} });
     const listed = new Set(Object.values((await s.vault.tree()).ids));
     const unknown = [...new Set(answers.map((a) => a.quiz))].filter((q) => !listed.has(q)).sort();
@@ -365,11 +355,8 @@ export function metaRoutes(app: Hono, s: Session): void {
   });
 
   app.put("/api/practice", async (c) => {
-    const body = await bodyOf(c);
-    const graduate = body.graduate;
-    if (graduateOf(graduate) !== graduate)
-      throw err(400, `\`graduate\` is a whole number from ${GRADUATE_MIN} to ${GRADUATE_MAX}`);
-    s.practice.setGraduate(graduate as number);
+    const { graduate } = await bodyAs(c, GraduateBody);
+    s.practice.setGraduate(graduate);
     return c.json({ graduate });
   });
 }
