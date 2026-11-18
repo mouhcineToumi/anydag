@@ -18,6 +18,10 @@ describe("kindOf", () => {
     ["test/parity.test.ts", "ignore"],
     ["desktop/main.ts", "ignore"],
     ["scripts/check-theme.mjs", "ignore"],
+    ["scripts/check-duplication.mjs", "ignore"],
+    ["scripts/lib/change.mjs", "ignore"],
+    ["scripts/complexity-baseline.json", "ignore"],
+    [".jscpd.json", "ignore"],
     /* a `.md` under boards/ is a fixture the suite draws, not prose */
     ["boards/local/reference/erd.board.md", "pixels"],
     ["boards/local/demo.board.md", "pixels"],
