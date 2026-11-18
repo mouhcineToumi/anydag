@@ -8,8 +8,8 @@
 #      own branch, and nothing here ever deletes one.** `develop` itself is never touched.
 #   2. **checks, e2e, desktop** — everything, against that tag: the fast tier and the api server's
 #      suites, the full Playwright run (`e2e.yml`), and the desktop app on all three systems.
-#      Beside them, **bench**: the two resource guards (`scripts/bench.mjs --guard`), which hold
-#      nothing back.
+#      Beside them, **bench**: the two resource guards (`scripts/bench.mjs --guard`), and the whole
+#      bench with its JSON kept as an artifact (`bench, full`), which hold nothing back.
 #   3. **publish** — a pre-release with every installer and the nightly update files
 #      (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`), and only if every one is there.
 #
@@ -267,6 +267,43 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npx vite build && node server/build.mjs
       - run: node scripts/bench.mjs --guard
+
+  # The whole bench (#527): every group at every vault size, `edit.*` included, with its JSON and its
+  # printed lines kept for ninety days as `bench-<version>`, so the numbers can be plotted night over
+  # night. A runner's numbers are not a laptop's and move with the host, so this is a record and not a
+  # guard: nothing here fails on a number, and `publish` does not wait for it. The `desktop` group
+  # records that it was skipped — there is no display, and no Electron, in the image.
+  bench-full:
+    name: bench, full
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+      options: --ipc=host
+    defaults:
+      run:
+        shell: bash
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx vite build && node server/build.mjs
+      - run: node scripts/bench.mjs --json bench.json 2>&1 | tee bench.txt
+      # Kept when the run fails too: `--json` is written with whatever was measured before it stopped.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: bench-${{ needs.prepare.outputs.version }}
+          path: |
+            bench.json
+            bench.txt
+          retention-days: 90
+          if-no-files-found: ignore
 
   publish:
     name: publish

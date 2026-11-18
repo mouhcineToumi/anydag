@@ -8,7 +8,7 @@
  * written but the built bundles, and the folder is removed by its exact path when the run ends.
  *
  *   node scripts/bench.mjs [--quick] [--guard] [--release] [--save] [--sizes 100,1000,10000,50000]
- *                          [--only <groups>] [--json <file>] [--keep]
+ *                          [--only <groups>] [--json <file>] [--app <checkout>] [--keep]
  *
  *   --quick   small steps only (vaults of 100 and 1k files, boards of 10 and 100 items, diagrams of
  *             50 and 200 nodes, attachments of 1 and 10 MB, graphs of 500 and 2k files): a few
@@ -23,7 +23,10 @@
  *   --sizes   the vault sizes, in files (default 100,1000,10000,50000)
  *   --only    a comma list of groups: vault, page, board, edit, attach, leak, desktop, graph,
  *             graph-page (default all; with --release, the four groups its rows come from)
- *   --json    also write every measurement, with the machine, to this file
+ *   --json    also write every measurement, with the machine, to this file — whatever was measured,
+ *             when the run stops early too
+ *   --app     measure the build in another checkout (its `server/dist/` and `dist/`) rather than
+ *             this one's; `scripts/bench-compare.mjs` measures a pull request's base and head so
  *   --keep    leave the temp folder in place and say where it is
  *
  * Needs the built page and server (`npm run build && node server/build.mjs`), except `--only graph`,
@@ -130,13 +133,16 @@ const require = createRequire(import.meta.url);
 const { chromium, _electron } = require("@playwright/test");
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SERVER = path.join(root, "server", "dist", "anydag-server.mjs");
-const PAGE = path.join(root, "dist", "index.html");
-const DESKTOP = path.join(root, "desktop", "dist", "main.cjs");
+const argv = process.argv.slice(2);
+/* The app measured: this checkout's build, or another's with `--app` (the pull request's bench
+   measures its base and its head with one script). The server finds the page beside itself. */
+const APP = path.resolve(argv.includes("--app") ? argv[argv.indexOf("--app") + 1] : root);
+const SERVER = path.join(APP, "server", "dist", "anydag-server.mjs");
+const PAGE = path.join(APP, "dist", "index.html");
+const DESKTOP = path.join(APP, "desktop", "dist", "main.cjs");
 
 /* -- arguments ------------------------------------------------------------------------------- */
 
-const argv = process.argv.slice(2);
 if (argv.includes("--help") || argv.includes("-h")) {
   console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("*/")[0]);
   process.exit(0);
@@ -187,7 +193,7 @@ for (const [file, what] of [
   [PAGE, "npm run build"],
 ]) {
   if (NEEDS_BUILD && !fs.existsSync(file)) {
-    console.error(`bench: ${path.relative(root, file)} is missing — run \`${what}\` first`);
+    console.error(`bench: ${path.relative(root, file) || file} is missing — run \`${what}\` first`);
     process.exit(2);
   }
 }
@@ -2232,6 +2238,7 @@ async function main() {
   console.log(`# AnyDag bench · ${started}`);
   console.log(`# ${m.cpu} · ${m.cores} cores · ${m.memoryGB} GB · ${m.os} · ${m.arch} · Node ${m.node}`);
   console.log(`# temp: ${work}  (${m.disk})`);
+  if (APP !== root) console.log(`# app: ${APP}`);
   if (RELEASE) console.log("# release: the table's ten rows, a 1k-file vault and a 500-item board");
   const wantBrowser = GUARD || ONLY.has("page") || ONLY.has("board") || ONLY.has("edit") || ONLY.has("graph-page");
   const b = wantBrowser ? await launchBrowser() : null;
@@ -2260,10 +2267,12 @@ async function main() {
     }
   } finally {
     if (b) await b.stop();
-  }
-  if (JSON_OUT) {
-    fs.writeFileSync(JSON_OUT, `${JSON.stringify({ machine: m, started, args: argv, results }, null, 2)}\n`);
-    console.log(`# wrote ${JSON_OUT}`);
+    /* Written whether or not every group finished: a long run that stops at its last step keeps
+       what it measured before it (the nightly keeps this file). */
+    if (JSON_OUT) {
+      fs.writeFileSync(JSON_OUT, `${JSON.stringify({ machine: m, started, args: argv, results }, null, 2)}\n`);
+      console.log(`# wrote ${JSON_OUT}`);
+    }
   }
   if (RELEASE) {
     const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();

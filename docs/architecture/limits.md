@@ -459,6 +459,31 @@ measures 0.97 s here and 1.8 s on two cores, which is about a runner). A ceiling
 runner measures, so the job goes red on a 2x regression and not on a slow night; it holds nothing
 back. Raise a ceiling only with a run that says why.
 
+**A pull request against its base** (`.github/workflows/bench.yml`, #527). When the change can reach
+the built page or server (`scripts/bench-plan.mjs`, `e2e-plan.mjs`'s rule read for the bench), the job
+installs and builds the pull request's head and its merge base on one runner, and
+`scripts/bench-compare.mjs` runs the head's `bench.mjs --only edit --sizes 1000` on each with `--app`,
+three rounds each, in turn (base then head, then head then base). A runner's absolute numbers move
+with whatever shares its host; two builds measured one after the other on it do not move between each
+other. A metric is **slower** when the head's median is at least 1.5× the base's and 50 ms more, every
+head round is above every base round, and the base's own three rounds are within 1.5× of each other —
+a metric that moves that much between two runs of one build is reported as **noisy** and never
+flagged. The table goes in the job summary and in one comment on the pull request, edited in place.
+It is **advisory**: not a required check, so the merge queue, which reads only those, never waits on
+it. It joins them when its record says it does not go red on noise. The first record, on #527's own
+pull requests: a deliberate 300 ms delay in the note's save path was flagged
+(`edit.1000.note.save` 264 → 565 ms locally, ×2.14), and the other eleven metrics read `same`, each
+within a few milliseconds. The 50 ms floor keeps a 20 ms card edit out of it, where one frame's
+timing alone moves the number; the note's save, whose rounds are within 10 ms of each other, is
+where a regression of a tenth of a second shows first.
+
+**The whole bench every night** (`bench, full` in `nightly.yml`): every group at every vault size, in
+the image the guards use, with its JSON and its printed lines kept as the run's `bench-<version>`
+artifact for ninety days, so a number can be plotted night over night. `--json` is written with what
+was measured even when a group stops the run. It is a record, not a guard: a runner's numbers are not
+this file's, and nothing fails on one. The `desktop` group says it was skipped: the image has no
+display and no Electron.
+
 **Out, and why:** a guard on every number — the nightly holds the two that are cheap and stable, and
 the rest moved by up to 2x between runs on this laptop (a board timed straight after the 50k vault,
 with the browser still giving back gigabytes, was twice as slow, which is why boards now run first), and
