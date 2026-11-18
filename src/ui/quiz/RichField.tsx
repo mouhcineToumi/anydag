@@ -29,7 +29,8 @@ export interface FieldHost {
 export const FieldHostContext = createContext<FieldHost | null>(null);
 
 /** What closing a field over: a press or a focus in any of these is still the field's — its menus, its toolbar, an equation's TeX. */
-const STILL_OURS = ".dag-blocks, [data-dag-math-field], .bn-ui-container, .mantine-Popover-dropdown, .mantine-Menu-dropdown";
+export const STILL_OURS =
+  ".dag-blocks, [data-dag-math-field], .bn-ui-container, .mantine-Popover-dropdown, .mantine-Menu-dropdown";
 
 /** Put the caret in a field: its drawing takes the focus, and opening is what focusing it does. */
 export function focusField(el: Element | null | undefined): void {
@@ -40,7 +41,15 @@ export function focusField(el: Element | null | undefined): void {
 export interface RichFieldProps {
   md: string;
   variant: "line" | "block";
+  /** Its name: the accessible one always, and drawn above the box when `shown` (#257). */
   label: string;
+  /**
+   * The label drawn above the field, filled or not — a filled box has no placeholder left to say
+   * which one it is, and a flashcard's front, details and back were three boxes alike. `note` is a
+   * few words after it at regular weight: whether it is optional, when the learner sees it.
+   */
+  shown?: boolean;
+  note?: string;
   placeholder: string;
   onCommit(md: string): void;
   /** Enter in a one-line field. */
@@ -56,6 +65,8 @@ export function RichField({
   md,
   variant,
   label,
+  shown,
+  note,
   placeholder,
   onCommit,
   onEnter,
@@ -176,12 +187,14 @@ export function RichField({
     });
   };
 
-  return (
+  const field = (
     <div
       ref={box}
       className={`dag-quiz__rich dag-quiz__rich--${variant}${className ? ` ${className}` : ""}`}
       data-dag-quiz-field=""
       data-dag-quiz-open-field={open ? "" : undefined}
+      /* Nothing in it: drawn as a dashed slot, so a blank quiz does not look written (#257). */
+      data-dag-quiz-empty={md.trim() ? undefined : ""}
       onPointerDown={(e) => {
         /* A press on the drawing opens it — `focus` does the rest, and does it for the keyboard too. */
         if (!open && !readOnly && e.button === 0) {
@@ -210,5 +223,25 @@ export function RichField({
         view
       )}
     </div>
+  );
+  if (!shown) return field;
+  return (
+    <>
+      {/* Hidden from a screen reader, which hears the same name on the field itself. A press on it
+          is a press on the field. */}
+      <div
+        className="dag-quiz__label"
+        aria-hidden="true"
+        onPointerDown={(e) => {
+          if (readOnly || e.button !== 0) return;
+          e.preventDefault();
+          focusField(box.current);
+        }}
+      >
+        {label}
+        {note ? <span className="dag-quiz__label-note"> · {note}</span> : null}
+      </div>
+      {field}
+    </>
   );
 }

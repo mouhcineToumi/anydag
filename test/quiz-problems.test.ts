@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseQuiz } from "@/quiz/parse";
-import { said } from "@/ui/quiz/problems";
+import { blank, said, unfinished } from "@/ui/quiz/problems";
 
 /** One file for each code, the question it is on first when there is one. */
 const CASES: Record<string, string> = {
@@ -43,5 +43,24 @@ describe("the quiz form's problems", () => {
     const quiz = parseQuiz(CASES.EQ_EMPTY_OPTION!);
     const d = quiz.diagnostics.find((x) => x.code === "EQ_EMPTY_OPTION")!;
     expect(said(d, quiz.questions[0])!.fix).toEqual({ kind: "focus", field: "option", option: 1 });
+  });
+});
+
+describe("a question being written (#257)", () => {
+  it("is blank with no words in any field, whatever its kind and ticks", () => {
+    const q = (text: string) => parseQuiz(text).questions[0]!;
+    expect(blank(q("## {#qa}\n- [ ]\n- [ ]\n"))).toBe(true);
+    expect(blank(q("## {#qa multi}\n- [x]\n- [ ]\n"))).toBe(true);
+    expect(blank(q("## {#qa card}\n"))).toBe(true);
+    expect(blank(q("## Q {#qa}\n- [ ]\n- [ ]\n"))).toBe(false);
+    expect(blank(q("## {#qa}\n- [ ] a\n- [ ]\n"))).toBe(false);
+    expect(blank(q("## {#qa card}\n\n> The back.\n"))).toBe(false);
+    expect(blank(q("## {#qa}\n\nSome details.\n\n- [ ]\n- [ ]\n"))).toBe(false);
+  });
+
+  it("is quiet about what it lacks, never about the file around it", () => {
+    const lacks = ["EQ_NO_PROMPT", "EQ_NO_OPTIONS", "EQ_ONE_OPTION", "EQ_NO_ANSWER", "EQ_EMPTY_OPTION"];
+    for (const code of Object.keys(CASES) as (keyof typeof CASES)[])
+      expect(unfinished(code as Parameters<typeof unfinished>[0]), code).toBe(lacks.includes(code));
   });
 });
