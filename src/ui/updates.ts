@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { desktop, type UpdateState } from "@/vault/desktop";
+import { desktop, type UpdateChannel, type UpdateState } from "@/vault/desktop";
 import { flushPending } from "./pendingWrites";
 
 /**
@@ -47,4 +47,18 @@ export async function installUpdate(): Promise<void> {
 /** *Check for updates*: the shell answers with the state the check ended in. */
 export async function checkForUpdates(): Promise<void> {
   await desktop()?.updates?.check();
+}
+
+/** Follow another update channel from the next check on (#525). The shell keeps the choice. */
+export async function chooseUpdateChannel(channel: UpdateChannel): Promise<void> {
+  await desktop()?.updates?.setChannel(channel);
+}
+
+/**
+ * The confirmed downgrade: called only from the confirmation in Settings → About, with the version
+ * the person said yes to. The shell fetches it (or opens its release page); the restart is still
+ * the Update button's.
+ */
+export async function downgradeTo(version: string): Promise<void> {
+  await desktop()?.updates?.downgrade(version);
 }

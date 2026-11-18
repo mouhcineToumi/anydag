@@ -10,7 +10,8 @@ import { openSettings } from "./sidebar";
  *
  * There is no Electron here, so the desktop bridge is a stub — and it is `desktop/preload.ts`'s
  * `updates`, member for member: `state()` resolves the state, `onChange(listener)` returns its
- * unsubscribe, `check()` resolves the state the check ended in, `install()` resolves nothing. The
+ * unsubscribe, `check()` resolves the state the check ended in, `install()` resolves nothing,
+ * `setChannel(channel)` and `downgrade(version)` resolve the state after (#525). The
  * state is `desktop/updates.ts`'s `UpdateState`. What a stub cannot show is the restart itself
  * (the shell stopping the server and `quitAndInstall`) or the release page opening: those are the
  * main process's, held by `test/desktop-updates.test.ts` against a fake updater, and by a packaged
@@ -39,13 +40,15 @@ test.use({
 });
 
 interface State {
-  status: "idle" | "checking" | "downloading" | "ready" | "manual" | "error";
+  status: "idle" | "checking" | "downloading" | "ready" | "manual" | "downgrade" | "error";
   enabled: boolean;
   current: string;
   version: string | null;
   percent: number | null;
   checkedAt: number | null;
   error: string | null;
+  channel: string;
+  versionChannel: string;
 }
 
 const IDLE: State = {
@@ -56,6 +59,8 @@ const IDLE: State = {
   percent: null,
   checkedAt: null,
   error: null,
+  channel: "latest",
+  versionChannel: "latest",
 };
 
 declare global {
@@ -92,6 +97,15 @@ async function bridge(page: Page, first: State = IDLE): Promise<void> {
         install: async () => {
           window.shellHeard.push("install");
         },
+        setChannel: async (channel: string) => {
+          window.shellHeard.push(`channel:${channel}`);
+          window.shellSays({ ...state, channel });
+          return state;
+        },
+        downgrade: async (version: string) => {
+          window.shellHeard.push(`downgrade:${version}`);
+          return state;
+        },
       },
     };
   }, first);
@@ -114,6 +128,7 @@ test("in a browser, with no desktop bridge, there is no Update button", { tag: "
   await openSettings(page, "about");
   await expect(page.locator("[data-dag-setting-version]")).toBeVisible();
   await expect(page.locator("[data-dag-setting-update]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-setting-update-channel]")).toHaveCount(0);
 });
 
 test("the button shows only when an update is ready, beside Settings, and a click installs", { tag: "@smoke" }, async ({
@@ -174,6 +189,7 @@ test("a desktop run with nothing packaged shows no button and no update facts", 
   await openSettings(page, "about");
   await expect(page.locator("[data-dag-setting-version]")).toBeVisible();
   await expect(page.locator("[data-dag-setting-update]")).toHaveCount(0);
+  await expect(page.locator("[data-dag-setting-update-channel]")).toHaveCount(0);
 });
 
 test("About shows the version, checks on request, and says what went wrong in words", async ({ page }) => {
@@ -211,4 +227,54 @@ test("About shows the version, checks on request, and says what went wrong in wo
   await says(page, { ...IDLE, status: "ready", version: "0.6.0", percent: 100, checkedAt: stamp });
   await expect(page.locator("[data-dag-setting-update]")).toContainText("Version 0.6.0 is ready");
   await expect(page.locator("[data-dag-setting-update-check]")).toBeDisabled();
+});
+
+test("the update channel shows the version's own, and a choice goes to the shell", async ({ page }) => {
+  await bridge(page, { ...IDLE, current: "0.8.0-nightly.202611170230", channel: "nightly", versionChannel: "nightly" });
+  await open(page);
+  await openSettings(page, "about");
+  const channel = page.locator("[data-dag-setting-update-channel]");
+  await expect(channel).toHaveValue("nightly");
+  await expect(channel.locator("option")).toHaveText(["Stable", "Beta", "Nightly"]);
+  await expect(page.getByText("This version's own is Nightly.", { exact: false })).toBeVisible();
+
+  await channel.selectOption("latest");
+  await expect.poll(() => page.evaluate(() => window.shellHeard)).toEqual(["channel:latest"]);
+  await expect(channel).toHaveValue("latest");
+  /* A choice is a preference, and says it was kept, like every row in Settings. */
+  await expect(page.locator("[data-dag-setting-saved]")).toBeVisible();
+});
+
+test("a downgrade is said in words, and goes to the shell only after a yes", async ({ page }) => {
+  const nightly = "0.8.0-nightly.202611170230";
+  await bridge(page, {
+    ...IDLE,
+    status: "downgrade",
+    current: nightly,
+    version: "0.7.0",
+    checkedAt: Date.now(),
+    channel: "latest",
+    versionChannel: "nightly",
+  });
+  await open(page);
+  /* Not something the sidebar offers: it waits for the person in Settings. */
+  await expect(button(page)).toHaveCount(0);
+  await openSettings(page, "about");
+  const line = `You are on ${nightly}; the newest stable is 0.7.0. Installing it is a downgrade.`;
+  await expect(page.locator("[data-dag-setting-update]")).toHaveText(line);
+  await expect(page.locator("[data-dag-setting-update-check]")).toBeEnabled();
+
+  const offer = page.locator('[data-dag-setting-update-downgrade="0.7.0"]');
+  await offer.click();
+  const ask = page.locator('[data-dag-update-downgrade-ask="0.7.0"]');
+  await expect(ask).toBeVisible();
+  await expect(ask.getByRole("alertdialog")).toContainText(line);
+  await ask.getByRole("button", { name: "Cancel" }).click();
+  await expect(ask).toHaveCount(0);
+  expect(await page.evaluate(() => window.shellHeard)).toEqual([]);
+
+  await offer.click();
+  await page.locator("[data-dag-update-downgrade-confirm]").click();
+  await expect.poll(() => page.evaluate(() => window.shellHeard)).toEqual(["downgrade:0.7.0"]);
+  await expect(ask).toHaveCount(0);
 });
