@@ -134,7 +134,11 @@ stable build never sees a pre-release and a nightly build follows nightlies. `de
 `allowDowngrade`. **electron-builder does not read the channel off the version for the `github`
 provider** (its `detectUpdateChannel` is for `generic` and S3-like ones), so `desktop/package.mjs`
 passes `-c.publish.channel=<word>` for a pre-release, and fails a build whose update files do not match
-its channel. Without it every nightly wrote `latest*.yml` and none published (#116).
+its channel. Without it every nightly wrote `latest*.yml` and none published (#116). The word is the
+*default*: Settings → About lets a person follow another channel on their machine (#525), handed to
+the updater as a feed (`desktop/feed.ts`), still without `autoUpdater.channel`, and going back to a
+steadier channel installs an older version only after the person confirms it (*Updates* in
+[`desktop.md`](desktop.md)). Nothing about how a release or a nightly publishes changed with it.
 
 **The file names are the updater's URLs**, so none has a space: `AnyDag-<v>.AppImage`,
 `AnyDag-Setup-<v>.exe`, `AnyDag-<v>-<arm64|x64>.dmg` and `.zip`. electron-builder's default
@@ -261,8 +265,9 @@ checks, one line saying so; only prose changed (a `.md` outside `boards/`, or `d
 
 **The browser selection** is `scripts/e2e-plan.mjs`'s answer for the diff against `origin/develop` (else
 `origin/main`, else the whole suite), one `--grep`: docs, CI config and unit tests run nothing;
-application code the `@smoke` tier; what can move pixels (`boards/`, `icons/`, the drawing layers of
-`src/`) also `reference.spec.ts`; `api/` and `server/sync/` also `sync.spec.ts`; and a change under
+application code the `@smoke` tier; what can move pixels (`boards/`, `icons/`, `themes/`, the drawing
+layers of `src/`) also `reference.spec.ts` and `surfaces.spec.ts`; the chrome (`src/ui/`, `src/settings/`)
+also `surfaces.spec.ts`, every top-level surface in light and dark (#528); `api/` and `server/sync/` also `sync.spec.ts`; and a change under
 `e2e/` the specs Playwright's `--only-changed` traces it to. A pull request's shards run it; so does
 `ANYDAG_PREPUSH_E2E=1 git push`, in the image when Docker answers, else on the host with no screenshots,
 and it says which. The number of browsers comes from the machine (`scripts/e2e-lib.sh`: cores − 2 and

@@ -184,6 +184,11 @@ same word off the running version:
 | `0.3.0-beta.2` | beta | `beta*.yml` | the next beta, and stable releases |
 | `0.3.0-nightly.202611070230` | nightly | `nightly.yml` / `nightly-linux.yml` / `nightly-mac.yml` | only nightlies |
 
+That is the default. A person may choose another channel in Settings → About (#525): a stable build
+set to *Nightly* reads `nightly*.yml` and is offered the newest nightly, and a nightly build set to
+*Stable* reads GitHub's *latest* release — older than itself, so it is offered as a downgrade the
+person has to confirm. The choice is the machine's; nothing about publishing depends on it.
+
 `desktop/package.mjs` fails a package whose update files are not its version's channel's, and
 `scripts/check-release-assets.mjs` fails a release that lacks any installer or update file, or whose
 pre-release carries a `latest*.yml` (the file a stable build asks for). An unsigned macOS build —

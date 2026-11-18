@@ -11,7 +11,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
-import type { UpdateState } from "./updates";
+import type { UpdateChannel, UpdateState } from "./updates";
 
 declare const __ANYDAG_VERSION__: string;
 const VERSION: string = typeof __ANYDAG_VERSION__ === "string" ? __ANYDAG_VERSION__ : "dev";
@@ -48,6 +48,11 @@ export interface AnyDagDesktopUpdates {
   /** The Update button: restart into the new version (the server is stopped first), or, on a build
    *  that cannot install it, open the release page. The page writes what it holds before calling. */
   install(): Promise<void>;
+  /** Follow another channel from the next check on (#525); resolves with the state after. */
+  setChannel(channel: UpdateChannel): Promise<UpdateState>;
+  /** Install the older version a `downgrade` offers. The page calls it only after the person
+   *  confirmed that version; the shell ignores any other. */
+  downgrade(version: string): Promise<UpdateState>;
 }
 
 /** The mouse's back and forward buttons, which Windows and Linux deliver as app commands rather
@@ -142,6 +147,12 @@ const api: AnyDagDesktop = {
     },
     install(): Promise<void> {
       return ipcRenderer.invoke("update:install");
+    },
+    setChannel(channel: UpdateChannel): Promise<UpdateState> {
+      return ipcRenderer.invoke("update:channel", channel);
+    },
+    downgrade(version: string): Promise<UpdateState> {
+      return ipcRenderer.invoke("update:downgrade", version);
     },
   },
   keys: {
