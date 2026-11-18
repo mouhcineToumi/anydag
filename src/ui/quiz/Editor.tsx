@@ -2,13 +2,13 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Eye,
   CircleDot,
   Copy,
   GripVertical,
   ListChecks,
   MoreHorizontal,
   PenLine,
-  Pin,
   Plus,
   Sparkles,
   SquareStack,
@@ -19,6 +19,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -51,7 +52,7 @@ import {
 } from "@/quiz/write";
 import { ownAssets } from "@/render/assets";
 import { useAi } from "@/settings/useAi";
-import { Button, IconButton } from "@/ui/controls";
+import { Button, IconButton, Switch } from "@/ui/controls";
 import { startDrag } from "@/ui/pointerDrag";
 
 import { addCards } from "./generate";
@@ -59,6 +60,7 @@ import { GenerateCards } from "./GenerateCards";
 import { Menu } from "./Menu";
 import { blank, brief, said, fixLabel, unfinished, type Fix, type Said } from "./problems";
 import { FieldHostContext, focusField, RichField, STILL_OURS, type FieldHost } from "./RichField";
+import { Preview } from "./Preview";
 import { QuizMarkdown } from "./QuizMarkdown";
 
 /**
@@ -99,6 +101,45 @@ const KINDS: { kind: Kind; label: string; does: string; icon: LucideIcon }[] = [
 ];
 
 const KIND = Object.fromEntries(KINDS.map((k) => [k.kind, k])) as Record<Kind, (typeof KINDS)[number]>;
+
+type Mode = "edit" | "preview";
+
+/**
+ * Edit or Preview, on the open card's head (#257): one choice of two, so a radiogroup, as the Tasks
+ * page's List / Board is — one Tab stop, and the arrows move between them. Under 720px it is
+ * hidden and the card's menu offers the other one.
+ */
+function ModeSwitch({ mode, index, onMode }: { mode: Mode; index: number; onMode(next: Mode): void }) {
+  const choices: { value: Mode; label: string }[] = [
+    { value: "edit", label: "Edit" },
+    { value: "preview", label: "Preview" },
+  ];
+  return (
+    <span className="dag-quiz__preview-switch" role="radiogroup" aria-label={`Show question ${index + 1} as`}>
+      {choices.map(({ value, label }) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={mode === value}
+          tabIndex={mode === value ? 0 : -1}
+          className="dag-quiz__preview-choice"
+          data-dag-quiz-preview-choice={value}
+          onClick={() => onMode(value)}
+          onKeyDown={(e) => {
+            if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+            e.preventDefault();
+            const next = mode === "edit" ? "preview" : "edit";
+            onMode(next);
+            e.currentTarget.parentElement?.querySelector<HTMLElement>(`[data-dag-quiz-preview-choice="${next}"]`)?.focus();
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </span>
+  );
+}
 
 function KindIcon({ kind }: { kind: Kind }) {
   const Icon = KIND[kind].icon;
@@ -213,23 +254,6 @@ const WORDS: Record<Kind, FieldWords> = {
     why: { label: "Back", note: "shown when they turn the card", placeholder: "The answer on the back" },
   },
 };
-
-/**
- * Why an answer keeps its place when the answers shuffle: pinned by hand, by its own words ("All of
- * the above" speaks about the answers around it, `pinned`), or not at all. The pin's title and its
- * `data-dag-quiz-pin` say which.
- */
-type PinState = "hand" | "words" | "free";
-const PIN_TITLE: Record<PinState, string> = {
-  hand: "Keeps its place when the answers shuffle — click to let it move",
-  words: "Keeps its place: it speaks about the answers around it",
-  free: "Keep its place when the answers shuffle",
-};
-const PIN_ATTR: Record<PinState, string | undefined> = { hand: "", words: "words", free: undefined };
-function pinState(o: Question["options"][number]): PinState {
-  if (o.pin) return "hand";
-  return pinned(o) ? "words" : "free";
-}
 
 /** An answer's text field: `data-dag-quiz-wants` marks one left blank, which the form asks for. */
 function answerAttrs(blank: boolean): Record<string, string> {
@@ -405,6 +429,44 @@ function FoldedRow({ q, kind, name, shown, onOpen }: { q: Question; kind: Kind; 
   );
 }
 
+/**
+ * An answer's place while the quiz shuffles (#257): one that names the others ("All of the above")
+ * says in words that it stays, and any other is a toggle, *Keep in place* or *Kept in place*.
+ */
+function AnswerPin({
+  option,
+  index,
+  last,
+  held,
+  onToggle,
+}: {
+  option: Question["options"][number];
+  index: number;
+  last: boolean;
+  held: boolean;
+  onToggle(): void;
+}) {
+  if (!option.pin && pinned(option))
+    return (
+      <span className="dag-quiz__pin dag-quiz__pin--words" data-dag-quiz-pin="words">
+        {last ? "Stays last" : "Stays in place"}: it names the others
+      </span>
+    );
+  return (
+    <button
+      type="button"
+      className="dag-quiz__pin"
+      aria-pressed={option.pin}
+      aria-label={`${option.pin ? "Kept" : "Keep"} in place: answer ${index + 1}`}
+      disabled={held}
+      data-dag-quiz-pin={option.pin ? "" : undefined}
+      onClick={onToggle}
+    >
+      {option.pin ? "Kept in place" : "Keep in place"}
+    </button>
+  );
+}
+
 function QuestionCard({
   q,
   index,
@@ -434,6 +496,8 @@ function QuestionCard({
      first, and the kind it was turning into is kept for the answer. */
   const [dropping, setDropping] = useState<"written" | "card" | null>(null);
   const [details, setDetails] = useState(false);
+  /* The open card shows its form or its Preview (#257); folding it goes back to the form. */
+  const [mode, setMode] = useState<Mode>("edit");
   /* An answer just added: it opens as it is drawn, in the same render as the press, so a letter
      typed straight after is never the page's. Let go once it has. */
   const [fresh, setFresh] = useState<number | null>(null);
@@ -521,12 +585,19 @@ function QuestionCard({
   };
 
   const showDetails = details || !!q.body.trim();
+  /* What the card says on itself, worked out once for both its folded and its open form. */
+  const qid = q.id ?? `L${q.line}`;
+  const lacking = shown.length ? "" : undefined;
+  const notReady = shown.some((p) => p.severity === "error") ? "Not ready to practise yet" : undefined;
+  const dropWhat = dropping === "card" ? "A flashcard" : "Answered in words, this question";
+  const tickNote = kind === "one" ? "tick the right one" : "tick every right one";
 
   /* Folded, a question's open-only asks are let go: a confirm left showing would come back with it. */
   useEffect(() => {
     if (open) return;
     setAsking(false);
     setDropping(null);
+    setMode("edit");
   }, [open]);
 
   /* The grip: dragged by the pointer, moved a place by Alt+↑/↓ — the one way to reorder (#257). */
@@ -551,10 +622,10 @@ function QuestionCard({
       <section
         ref={card}
         className="dag-quiz__card dag-quiz__card--folded"
-        data-dag-quiz-question={q.id ?? `L${q.line}`}
+        data-dag-quiz-question={qid}
         data-dag-quiz-kind={kind}
         data-dag-quiz-folded=""
-        data-dag-quiz-unfinished={shown.length ? "" : undefined}
+        data-dag-quiz-unfinished={lacking}
         aria-label={`Question ${index + 1}`}
         onFocusCapture={onEnter}
         onPointerDownCapture={onEnter}
@@ -569,10 +640,10 @@ function QuestionCard({
     <section
       ref={card}
       className="dag-quiz__card"
-      data-dag-quiz-question={q.id ?? `L${q.line}`}
+      data-dag-quiz-question={qid}
       data-dag-quiz-kind={kind}
       data-dag-quiz-needs-answer={needsAnswer ? "" : undefined}
-      data-dag-quiz-unfinished={shown.length ? "" : undefined}
+      data-dag-quiz-unfinished={lacking}
       aria-label={`Question ${index + 1}`}
       onFocusCapture={onEnter}
       onPointerDownCapture={onEnter}
@@ -613,6 +684,7 @@ function QuestionCard({
           }
         </Menu>
         <span className="dag-quiz__card-tools">
+          <ModeSwitch mode={mode} index={index} onMode={setMode} />
           <Menu
             label={`Question ${index + 1}`}
             buttonClass="dag-icon dag-icon--md dag-quiz__card-more"
@@ -623,6 +695,24 @@ function QuestionCard({
           >
             {(close) => (
               <>
+                {/* Under 720px the Edit / Preview switch is here rather than in the head (#257, B8). */}
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dag-more__item dag-quiz__menu-narrow"
+                  data-dag-quiz-preview-item={mode === "edit" ? "preview" : "edit"}
+                  onClick={() => {
+                    close();
+                    setMode(mode === "edit" ? "preview" : "edit");
+                  }}
+                >
+                  {mode === "edit" ? (
+                    <Eye size={14} strokeWidth={2} aria-hidden="true" />
+                  ) : (
+                    <PenLine size={14} strokeWidth={2} aria-hidden="true" />
+                  )}
+                  <span>{mode === "edit" ? "Preview" : "Edit"}</span>
+                </button>
                 <button
                   type="button"
                   role="menuitem"
@@ -678,9 +768,7 @@ function QuestionCard({
       ) : null}
       {dropping ? (
         <p className="dag-quiz__confirm dag-quiz__confirm--line" data-dag-quiz-drop-answers="">
-          <span>
-            {dropping === "card" ? "A flashcard" : "Answered in words, this question"} has no answers to choose from. Remove them?
-          </span>
+          <span>{dropWhat} has no answers to choose from. Remove them?</span>
           <button
             type="button"
             className="dag-quiz__danger"
@@ -697,168 +785,175 @@ function QuestionCard({
           </button>
         </p>
       ) : null}
-      <ProblemList
-        list={shown}
-        title={shown.some((p) => p.severity === "error") ? "Not ready to practise yet" : undefined}
-        onFix={fix}
-        onStray={(to) => onRepair({ kind: "stray", to })}
-        stray={q.stray}
-        name={name}
-      />
-      {refused ? (
-        <p className="dag-quiz__note" role="alert" data-dag-quiz-refused="">
-          {refused}
-        </p>
-      ) : null}
-      <RichField
-        variant="line"
-        label={words.prompt.label}
-        shown
-        note={words.prompt.note}
-        placeholder={words.prompt.placeholder}
-        md={q.prompt}
-        readOnly={held}
-        autoFocus={focus}
-        className="dag-quiz__prompt"
-        attrs={{ "data-dag-quiz-prompt": "" }}
-        onCommit={(prompt) => onEdit({ ...input, prompt })}
-        onEnter={onNext}
-      />
-      {showDetails ? (
-        <RichField
-          variant="block"
-          label="Details"
-          shown
-          note={words.bodyNote}
-          placeholder="A code sample, a picture, an equation"
-          md={q.body}
-          readOnly={held}
-          autoFocus={details && !q.body.trim()}
-          attrs={{ "data-dag-quiz-body": "" }}
-          onCommit={(body) => onEdit({ ...input, body })}
+      {mode === "preview" ? (
+        <Preview
+          key={`${q.options.map((o) => (pinned(o) ? "k" : "-")).join("")}:${shuffle}`}
+          name={name}
+          q={q}
+          shuffle={shuffle}
+          index={index}
         />
       ) : (
-        <button
-          type="button"
-          className="dag-quiz__more"
-          data-dag-quiz-add-details=""
-          disabled={held}
-          onClick={() => setDetails(true)}
-        >
-          <Plus size={14} strokeWidth={2} aria-hidden="true" />
-          Add details: code, a picture, an equation
-        </button>
-      )}
-      {wordsOnly(kind) ? null : (
         <>
-          <div className="dag-quiz__label" aria-hidden="true">
-            Answers
-            <span className="dag-quiz__label-note"> · {kind === "one" ? "tick the right one" : "tick every right one"}</span>
-          </div>
-          <div className="dag-quiz__options" role="list" aria-label="Answers" ref={optionList}>
-            {q.options.map((o, i) => (
-              <div
-                key={i}
-                className="dag-quiz__option"
-                role="listitem"
-                data-dag-quiz-option={i}
-                data-dag-quiz-correct={o.correct ? "" : undefined}
-              >
-                <button
-                  type="button"
-                  className="dag-icon dag-quiz__grip"
-                  aria-label={`Move answer ${i + 1}: drag it, or Alt+Up and Alt+Down`}
-                  disabled={held}
-                  onKeyDown={(e) => {
-                    const to = moveKey(e, i, q.options.length);
-                    if (to === null) return;
-                    regrip.current = to;
-                    moveOption(i, to);
-                  }}
-                  onPointerDown={(e) =>
-                    dragRow(
-                      e,
-                      e.currentTarget.closest<HTMLElement>(".dag-quiz__option"),
-                      () => Array.from(optionList.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__option") ?? []),
-                      (to) => moveOption(i, to),
-                    )
-                  }
-                >
-                  <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
-                </button>
-                <input
-                  type={kind === "one" ? "radio" : "checkbox"}
-                  className={kind === "one" ? "dag-check dag-check--round" : "dag-check"}
-                  name={kind === "one" ? `correct-${q.id ?? q.line}` : undefined}
-                  checked={o.correct}
-                  disabled={held}
-                  aria-label={`Answer ${i + 1} is right`}
-                  title="The right answer"
-                  data-dag-quiz-correct-toggle=""
-                  onChange={(e) => choose(i, e.target.checked)}
-                />
-                <RichField
-                  variant="block"
-                  label={`Answer ${i + 1}`}
-                  placeholder={i === 0 ? "An answer" : "Another answer"}
-                  md={o.text}
-                  readOnly={held}
-                  autoFocus={fresh === i}
-                  className="dag-quiz__option-text"
-                  attrs={answerAttrs(emptyAnswers.has(i))}
-                  onCommit={(text) => setOption(i, { text })}
-                />
-                {shuffle ? (
-                  <button
-                    type="button"
-                    className="dag-icon dag-quiz__pin"
-                    aria-pressed={pinned(o)}
-                    disabled={held || (!o.pin && pinned(o))}
-                    title={PIN_TITLE[pinState(o)]}
-                    aria-label={`Keep answer ${i + 1} in its place`}
-                    data-dag-quiz-pin={PIN_ATTR[pinState(o)]}
-                    onClick={() => setOption(i, { pin: !o.pin })}
-                  >
-                    <Pin size={14} strokeWidth={2} aria-hidden="true" />
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="dag-icon"
-                  title="Remove answer"
-                  aria-label={`Remove answer ${i + 1}`}
-                  data-dag-quiz-remove-option=""
-                  disabled={held}
-                  onClick={() => onEdit({ ...input, options: input.options.filter((_, k) => k !== i) })}
-                >
-                  <X size={14} strokeWidth={2} aria-hidden="true" />
-                </button>
-              </div>
-            ))}
+          <ProblemList
+            list={shown}
+            title={notReady}
+            onFix={fix}
+            onStray={(to) => onRepair({ kind: "stray", to })}
+            stray={q.stray}
+            name={name}
+          />
+          {refused ? (
+            <p className="dag-quiz__note" role="alert" data-dag-quiz-refused="">
+              {refused}
+            </p>
+          ) : null}
+          <RichField
+            variant="line"
+            label={words.prompt.label}
+            shown
+            note={words.prompt.note}
+            placeholder={words.prompt.placeholder}
+            md={q.prompt}
+            readOnly={held}
+            autoFocus={focus}
+            className="dag-quiz__prompt"
+            attrs={{ "data-dag-quiz-prompt": "" }}
+            onCommit={(prompt) => onEdit({ ...input, prompt })}
+            onEnter={onNext}
+          />
+          {showDetails ? (
+            <RichField
+              variant="block"
+              label="Details"
+              shown
+              note={words.bodyNote}
+              placeholder="A code sample, a picture, an equation"
+              md={q.body}
+              readOnly={held}
+              autoFocus={details && !q.body.trim()}
+              attrs={{ "data-dag-quiz-body": "" }}
+              onCommit={(body) => onEdit({ ...input, body })}
+            />
+          ) : (
             <button
               type="button"
-              className="dag-quiz__add-option"
-              data-dag-quiz-add-option=""
+              className="dag-quiz__more"
+              data-dag-quiz-add-details=""
               disabled={held}
-              onClick={addOption}
+              onClick={() => setDetails(true)}
             >
               <Plus size={14} strokeWidth={2} aria-hidden="true" />
-              Add an answer
+              Add details: code, a picture, an equation
             </button>
-          </div>
+          )}
+          {wordsOnly(kind) ? null : (
+            <>
+              <div className="dag-quiz__label" aria-hidden="true">
+                Answers
+                <span className="dag-quiz__label-note"> · {tickNote}</span>
+              </div>
+              <div className="dag-quiz__options" role="list" aria-label="Answers" ref={optionList}>
+                {q.options.map((o, i) => (
+                  <div
+                    key={i}
+                    className="dag-quiz__option"
+                    role="listitem"
+                    data-dag-quiz-option={i}
+                    data-dag-quiz-correct={o.correct ? "" : undefined}
+                  >
+                    <button
+                      type="button"
+                      className="dag-icon dag-quiz__grip"
+                      aria-label={`Move answer ${i + 1}: drag it, or Alt+Up and Alt+Down`}
+                      disabled={held}
+                      onKeyDown={(e) => {
+                        const to = moveKey(e, i, q.options.length);
+                        if (to === null) return;
+                        regrip.current = to;
+                        moveOption(i, to);
+                      }}
+                      onPointerDown={(e) =>
+                        dragRow(
+                          e,
+                          e.currentTarget.closest<HTMLElement>(".dag-quiz__option"),
+                          () => Array.from(optionList.current?.querySelectorAll<HTMLElement>(":scope > .dag-quiz__option") ?? []),
+                          (to) => moveOption(i, to),
+                        )
+                      }
+                    >
+                      <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                    <input
+                      type={kind === "one" ? "radio" : "checkbox"}
+                      className={kind === "one" ? "dag-check dag-check--round" : "dag-check"}
+                      name={kind === "one" ? `correct-${q.id ?? q.line}` : undefined}
+                      checked={o.correct}
+                      disabled={held}
+                      aria-label={`Answer ${i + 1} is right`}
+                      data-dag-quiz-correct-toggle=""
+                      onChange={(e) => choose(i, e.target.checked)}
+                    />
+                    <RichField
+                      variant="block"
+                      label={`Answer ${i + 1}`}
+                      placeholder={i === 0 ? "An answer" : "Another answer"}
+                      md={o.text}
+                      readOnly={held}
+                      autoFocus={fresh === i}
+                      className="dag-quiz__option-text"
+                      attrs={answerAttrs(emptyAnswers.has(i))}
+                      onCommit={(text) => setOption(i, { text })}
+                    />
+                    {/* A pin in words, and only while the quiz shuffles: with no shuffle nothing moves (#257). */}
+                    {shuffle ? (
+                      <AnswerPin
+                        option={o}
+                        index={i}
+                        last={i === q.options.length - 1}
+                        held={held}
+                        onToggle={() => setOption(i, { pin: !o.pin })}
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      className="dag-icon"
+                      title="Remove answer"
+                      aria-label={`Remove answer ${i + 1}`}
+                      data-dag-quiz-remove-option=""
+                      disabled={held}
+                      onClick={() => onEdit({ ...input, options: input.options.filter((_, k) => k !== i) })}
+                    >
+                      <X size={14} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="dag-quiz__add-option"
+                  data-dag-quiz-add-option=""
+                  disabled={held}
+                  onClick={addOption}
+                >
+                  <Plus size={14} strokeWidth={2} aria-hidden="true" />
+                  Add an answer
+                </button>
+              </div>
+            </>
+          )}
+          <RichField
+            variant="block"
+            label={words.why.label}
+            shown
+            note={words.why.note}
+            placeholder={words.why.placeholder}
+            md={q.why}
+            readOnly={held}
+            attrs={{ "data-dag-quiz-why": "" }}
+            onCommit={(why) => onEdit({ ...input, why })}
+          />
         </>
       )}
-      <RichField
-        variant="block"
-        label={words.why.label}
-        shown
-        note={words.why.note}
-        placeholder={words.why.placeholder}
-        md={q.why}
-        readOnly={held}
-        attrs={{ "data-dag-quiz-why": "" }}
-        onCommit={(why) => onEdit({ ...input, why })}
-      />
     </section>
   );
 }
@@ -893,6 +988,7 @@ export function QuizEditor({
   children?: ReactNode;
 }) {
   const quiz = useMemo(() => parseQuiz(text), [text]);
+  const shuffleNote = useId();
   const [focus, setFocus] = useState<string | null>(null);
   const [refused, setRefused] = useState<{ key: string; why: string } | null>(null);
   /* The flashcards dialog (#140): open while a model's cards are asked for and chosen from. */
@@ -1130,17 +1226,20 @@ export function QuizEditor({
           attrs={{ "data-dag-quiz-description": "" }}
           onCommit={(md) => onChange(setDescription(text, md))}
         />
-        <label className="dag-quiz__check dag-quiz__shuffle">
-          <input
-            type="checkbox"
-            className="dag-check"
-            checked={quiz.shuffle}
-            data-dag-quiz-shuffle=""
-            onChange={(e) => onChange(setShuffle(text, e.target.checked))}
-          />
-          Shuffle the answers in each run
-          <span className="dag-quiz__hint"> — a pinned answer, and one that begins “All of the above”, keeps its place</span>
-        </label>
+        <div className="dag-quiz__shuffle">
+          <label className="dag-quiz__shuffle-label">
+            <Switch
+              checked={quiz.shuffle}
+              data-dag-quiz-shuffle=""
+              aria-describedby={shuffleNote}
+              onChange={(e) => onChange(setShuffle(text, e.target.checked))}
+            />
+            Shuffle the answers
+          </label>
+          <p className="dag-quiz__shuffle-note" id={shuffleNote}>
+            Each run shows a question's answers in a new order. While it does, an answer can be kept in place.
+          </p>
+        </div>
         {quiz.questions.length > 0 ? (
           <p className="dag-quiz__count" data-dag-quiz-count="">
             {quiz.questions.length} {quiz.questions.length === 1 ? "question" : "questions"}

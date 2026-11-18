@@ -1,9 +1,10 @@
-import { Check, ChevronLeft, ChevronRight, Info, PanelRightClose, RotateCcw, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Info, PanelRightClose, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { isRight, optionOrder, type Question } from "@/quiz/parse";
 import { QUIZ_ABOUT, readFlag, writeLocal } from "@/settings/prefs";
 
+import { Asked, isBlock, OptionText } from "./Asked";
 import { QuizMarkdown } from "./QuizMarkdown";
 import { answerIn, goTo, judgeIn, pickIn, revealIn, skippedIn, startRound, tally, typeIn, type Round } from "./round";
 
@@ -88,83 +89,6 @@ interface Props {
   after?(wrong: number, right: number): ReactNode;
 }
 
-/** An option of more than one line is block Markdown — a code block, a list — and drawn as one. */
-const isBlock = (md: string): boolean => md.includes("\n");
-
-/**
- * An option's words: one line inline in its row, as it always was; more, a block — a `<div>`, which
- * a code block's `<pre>` and its copy button can sit in. The copy button inside the label does not
- * pick the option: a click on interactive content in a label is that content's, not the label's.
- */
-function OptionText({ name, md, block }: { name: string; md: string; block: boolean }) {
-  return block ? (
-    <div className="dag-run__option-text dag-run__option-text--block dag-md">
-      <QuizMarkdown name={name} md={md} />
-    </div>
-  ) : (
-    <span className="dag-run__option-text dag-md">
-      <QuizMarkdown name={name} md={md} inline />
-    </span>
-  );
-}
-
-/** A model answer holding a fenced code block: the box it is compared with is a code box. */
-const CODE = /^ {0,3}(?:`{3,}|~{3,})/m;
-
-/**
- * Where an open question is answered: what was written stays with the question for the run,
- * and ctrl+Enter shows the model answer without leaving the box. Read-only once it is showing — the
- * words are for comparing, and nothing grades them.
- */
-function OpenAnswer({
-  text,
-  code,
-  shown,
-  onType,
-  onReveal,
-  onStep,
-}: {
-  text: string;
-  code: boolean;
-  shown: boolean;
-  onType(text: string): void;
-  onReveal(): void;
-  /** ← or → in an empty box, which has nothing for them to move over: the run's previous and next. */
-  onStep(by: -1 | 1): void;
-}) {
-  return (
-    <textarea
-      className={code ? "dag-run__answer dag-run__answer--code" : "dag-run__answer"}
-      data-dag-run-answer=""
-      aria-label="Your answer"
-      placeholder={code ? "Write it here, then compare it with the model answer" : "Write your answer"}
-      rows={Math.min(14, Math.max(code ? 5 : 3, text.split("\n").length + 1))}
-      spellCheck={!code}
-      autoCapitalize={code ? "off" : undefined}
-      autoCorrect={code ? "off" : undefined}
-      value={text}
-      readOnly={shown}
-      onChange={(e) => onType(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !shown) {
-          e.preventDefault();
-          onReveal();
-        } else if (
-          (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
-          text === "" &&
-          !e.shiftKey &&
-          !e.altKey &&
-          !e.ctrlKey &&
-          !e.metaKey
-        ) {
-          e.preventDefault();
-          onStep(e.key === "ArrowLeft" ? -1 : 1);
-        }
-      }}
-    />
-  );
-}
-
 const typingIn = (t: EventTarget | null): boolean => {
   const el = t as HTMLElement | null;
   if (!el) return false;
@@ -204,7 +128,6 @@ export function Runner({
   const done = state.finished;
   const at = state.at;
   const current = asked[at];
-  const multi = current?.question.multi ?? false;
   /* Where each option is shown: `order[k]` is the file's index of the option in place `k`. */
   const order = (current && orders.get(current)) ?? current?.question.options.map((_, i) => i) ?? [];
   const picked = state.picks[at] ?? [];
@@ -444,105 +367,21 @@ export function Runner({
               </div>
             </details>
           ) : null}
-          <div className="dag-run__prompt dag-md">
-            <h2 className="dag-run__question">
-              <QuizMarkdown name={name} md={q.prompt} inline />
-            </h2>
-            <QuizMarkdown name={name} md={q.body} />
-          </div>
-          <p className="dag-run__hint">
-            {q.card
-              ? "Think of the answer, then show the back."
-              : q.open
-                ? "Write your answer, then compare it with the model answer."
-                : multi
-                  ? "Choose every correct answer."
-                  : "Choose one answer."}
-          </p>
-          {q.card ? null : q.open ? (
-            <OpenAnswer
-              text={state.typed[at] ?? ""}
-              code={CODE.test(q.why)}
-              shown={shown}
-              onType={(text) => setState((r) => typeIn(r, text))}
-              onReveal={reveal}
-              onStep={(by) => (by < 0 ? previous() : next())}
-            />
-          ) : (
-            <div className="dag-run__options" role={multi ? "group" : "radiogroup"} aria-label="Options">
-              {order.map((i, place) => {
-                const o = q.options[i]!;
-                const on = picked.includes(i);
-                const mark = checked ? (o.correct ? "right" : on ? "wrong" : undefined) : undefined;
-                const block = isBlock(o.text);
-                return (
-                  <label
-                    key={i}
-                    className={block ? "dag-run__option dag-run__option--block" : "dag-run__option"}
-                    data-dag-run-option={i}
-                    data-dag-run-place={place}
-                    data-dag-run-picked={on ? "" : undefined}
-                    data-dag-run-mark={mark}
-                  >
-                    <input
-                      type={multi ? "checkbox" : "radio"}
-                      name={`dag-run-${round}-${at}`}
-                      checked={on}
-                      disabled={checked}
-                      onChange={() => toggle(i)}
-                    />
-                    <span className="dag-run__key" aria-hidden="true">
-                      {place < 9 ? place + 1 : ""}
-                    </span>
-                    <OptionText name={name} md={o.text} block={block} />
-                    {mark === "right" ? (
-                      <Check className="dag-run__mark" size={16} strokeWidth={2.5} aria-label="Correct" />
-                    ) : null}
-                    {mark === "wrong" ? (
-                      <X className="dag-run__mark" size={16} strokeWidth={2.5} aria-label="Not correct" />
-                    ) : null}
-                  </label>
-                );
-              })}
-            </div>
-          )}
-          {q.open && shown ? (
-            <div className="dag-run__verdict" data-dag-run-verdict={checked ? (right ? "right" : "wrong") : "open"}>
-              <p className="dag-run__verdict-line">
-                {checked ? (right ? "You had it." : "You missed it.") : q.card ? "The back" : "The model answer"}
-              </p>
-              <div className="dag-run__why dag-md" data-dag-run-model="">
-                <QuizMarkdown name={name} md={q.why} />
-              </div>
-              {checked ? null : (
-                <div className="dag-run__judge" role="group" aria-label="Did you get it?">
-                  <span className="dag-run__judge-ask">Did you get it?</span>
-                  <button type="button" className="dag-run__button" data-dag-run-judge="right" onClick={() => judge(true)}>
-                    <span className="dag-run__key" aria-hidden="true">
-                      1
-                    </span>
-                    I got it
-                  </button>
-                  <button type="button" className="dag-run__button" data-dag-run-judge="wrong" onClick={() => judge(false)}>
-                    <span className="dag-run__key" aria-hidden="true">
-                      2
-                    </span>
-                    I missed it
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : null}
-          {checked && !q.open ? (
-            <div className="dag-run__verdict" data-dag-run-verdict={right ? "right" : "wrong"}>
-              <p className="dag-run__verdict-line">{right ? "Right." : "Not quite."}</p>
-              {q.why ? (
-                <div className="dag-run__why dag-md">
-                  <QuizMarkdown name={name} md={q.why} />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+          <Asked
+            name={name}
+            q={q}
+            order={order}
+            picked={picked}
+            right={verdict}
+            shown={shown}
+            typed={state.typed[at] ?? ""}
+            group={`dag-run-${round}-${at}`}
+            onToggle={toggle}
+            onType={(text) => setState((r) => typeIn(r, text))}
+            onReveal={reveal}
+            onStep={(by) => (by < 0 ? previous() : next())}
+            onJudge={judge}
+          />
           <div className="dag-run__actions">
             <button
               type="button"

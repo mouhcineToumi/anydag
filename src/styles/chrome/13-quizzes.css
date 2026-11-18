@@ -435,9 +435,31 @@
 /* No answer is marked: the ticks are where to look. A warning, not a failure (#257). */
 .dag-quiz__card[data-dag-quiz-needs-answer] .dag-quiz__option > .dag-check { border-color: var(--dag-color-warning); box-shadow: 0 0 0 3px var(--dag-color-warningSoft); }
 .dag-quiz__option > .dag-icon { margin-top: 2px; }
-/* Pressed, a pin wears the accent: the option keeps its place when a run shuffles. */
-.dag-quiz__pin[aria-pressed="true"] { color: var(--dag-color-accent); }
-.dag-quiz__pin[aria-pressed="true"]:disabled { opacity: 0.6; }
+/* A pin in words (#257): *Keep in place* is quiet until pressed, *Kept in place* wears the accent,
+   and an answer that names the others says why it stays, with nothing to press. One width for all
+   of them, so the answers beside them end in a line. */
+.dag-quiz__pin {
+  flex: none;
+  box-sizing: border-box;
+  width: 15em;
+  margin-top: 6px;
+  padding: 3px 8px;
+  text-align: start;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  line-height: var(--dag-ui-leading-sm);
+  color: var(--dag-color-slate);
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+}
+button.dag-quiz__pin { cursor: pointer; }
+button.dag-quiz__pin:hover:not(:disabled) { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+button.dag-quiz__pin:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+button.dag-quiz__pin:disabled { opacity: 0.5; cursor: default; }
+.dag-quiz__pin[aria-pressed="true"] { font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-accent); }
+.dag-quiz__pin--words { font-style: italic; }
 .dag-quiz__option[data-dag-quiz-correct] > .dag-quiz__rich { border-color: var(--dag-color-successBorder); }
 .dag-quiz__add-option,
 .dag-quiz__add {
@@ -460,7 +482,77 @@
 .dag-quiz__add-option:focus-visible,
 .dag-quiz__add:focus-visible { box-shadow: var(--focus-ring); }
 .dag-quiz__check { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
-.dag-quiz__hint { color: var(--dag-color-slate); }
+/* The quiz's shuffle: a switch, and one line under it. */
+.dag-quiz__shuffle { margin-block: 0 14px; }
+.dag-quiz__shuffle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  cursor: pointer;
+}
+/* The switch is 32×18 drawn, in a 32×24 checkbox, so it meets the 24px target floor
+   (`e2e/touch-targets.spec.ts`): the track moves to `::before` and the knob to `::after`, as in
+   Settings under 720px, and the picture does not grow. */
+.dag-quiz__shuffle .dag-switch { height: 24px; background: transparent; }
+.dag-quiz__shuffle .dag-switch::before {
+  top: 3px;
+  left: 0;
+  width: 32px;
+  height: 18px;
+  background: var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-pill);
+  box-shadow: none;
+  transform: none;
+  transition: background-color var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
+}
+.dag-quiz__shuffle .dag-switch::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--dag-color-card);
+  border-radius: 50%;
+  box-shadow: var(--dag-ui-elevation-raised);
+  transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
+}
+.dag-quiz__shuffle .dag-switch:checked { background: transparent; }
+.dag-quiz__shuffle .dag-switch:checked::before { background: var(--dag-color-accent); transform: none; }
+.dag-quiz__shuffle .dag-switch:checked::after { transform: translateX(14px); }
+.dag-quiz__shuffle .dag-switch:focus-visible { box-shadow: none; }
+.dag-quiz__shuffle .dag-switch:focus-visible::before { box-shadow: var(--focus-ring); }
+/* Under the words, past the switch's 32px and the gap. */
+.dag-quiz__shuffle-note { margin: 2px 0 0 42px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+/* Edit or Preview, on the open card's head: the Tasks page's List / Board. */
+.dag-quiz__preview-switch { display: inline-flex; margin-right: 4px; padding: 2px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-control); }
+.dag-quiz__preview-choice {
+  min-height: 24px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quiz__preview-choice[aria-checked="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-quiz__preview-choice:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-quiz__menu .dag-more__item.dag-quiz__menu-narrow { display: none; }
+/* The Preview: the run's own drawing of the question, on the run's paper. */
+.dag-quiz__preview {
+  padding: 16px 18px;
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+}
+.dag-quiz__preview-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
+.dag-quiz__preview-note { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
 .dag-quiz__note { margin: 0 0 10px; font-size: var(--chrome-text-md); color: var(--dag-color-warningText); }
 .dag-quiz__note[data-dag-quiz-open] { color: var(--dag-color-slate); }
 .dag-quiz__adds { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -716,6 +808,13 @@
   .dag-quiz__card-head { flex-wrap: nowrap; }
   .dag-quiz__card-head > * { flex: none; }
   .dag-quiz__card-head > .dag-quiz__menu-box { flex: 0 1 auto; min-width: 0; }
+  /* Edit / Preview moves into the card's menu (#257, B8). */
+  .dag-quiz__preview-switch { display: none; }
+  .dag-quiz__menu .dag-more__item.dag-quiz__menu-narrow { display: flex; }
+  .dag-quiz__shuffle-note { margin-left: 0; }
+  /* A pin takes a line of its own under its answer, so the answer keeps the width. */
+  .dag-quiz__option { flex-wrap: wrap; }
+  .dag-quiz__pin { order: 1; width: auto; flex-basis: 100%; margin-top: -2px; text-align: end; white-space: normal; }
 }
 
 /* A quiz, embedded — on a board or in a note: its title, how many questions and how many in

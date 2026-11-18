@@ -334,7 +334,8 @@ test("Duplicate and Delete are in the open card's menu", async ({ page }) => {
   await page.goto(`/?quiz=${name}`);
   const vac = await openCard(page, "qvac");
   await vac.locator("[data-dag-quiz-card-more]").click();
-  await expect(vac.locator("[data-dag-quiz-card-menu] [role=menuitem]")).toHaveCount(2);
+  /* Two rows at this width; the third, Preview, is drawn only under 720px. */
+  await expect(vac.locator("[data-dag-quiz-card-menu] [role=menuitem]:visible")).toHaveCount(2);
   await vac.locator("[data-dag-quiz-duplicate]").click();
   const cards = page.locator("[data-dag-quiz-question]");
   await expect(cards).toHaveCount(2);
@@ -351,4 +352,126 @@ test("Duplicate and Delete are in the open card's menu", async ({ page }) => {
   await copy.locator("[data-dag-quiz-delete-yes]").click();
   await expect(cards).toHaveCount(1);
   await expect.poll(() => read("menu")).toBe(ONE);
+});
+
+const SHUFFLED = `---
+title: Drill
+---
+
+## Which command shows a query's plan? {#qplan}
+
+- [ ] DESCRIBE
+- [x] EXPLAIN
+- [ ] SHOW PLAN {pin}
+- [ ] None of the above
+`;
+
+test("shuffle is a switch with one line under it, and a pin says in words what it does, only while shuffling", async ({
+  page,
+}) => {
+  const name = write("pins", SHUFFLED);
+  await page.goto(`/?quiz=${name}`);
+  const shuffle = page.locator("[data-dag-quiz-shuffle]");
+  await expect(shuffle).toHaveAttribute("role", "switch");
+  await expect(shuffle).not.toBeChecked();
+  await expect(page.locator(".dag-quiz__shuffle-note")).toContainText("an answer can be kept in place");
+  const card = await openCard(page, "qplan");
+  /* Shuffle off: nothing moves, so there is nothing to keep in place. */
+  await expect(card.locator(".dag-quiz__pin")).toHaveCount(0);
+
+  await shuffle.check();
+  await expect.poll(() => read("pins")).toContain("shuffle: true");
+  const pins = card.locator(".dag-quiz__option .dag-quiz__pin");
+  await expect(pins).toHaveCount(4);
+  await expect(pins.nth(0)).toHaveText("Keep in place");
+  await expect(pins.nth(0)).toHaveAttribute("aria-pressed", "false");
+  await expect(pins.nth(2)).toHaveText("Kept in place");
+  await expect(pins.nth(2)).toHaveAttribute("aria-pressed", "true");
+  /* The answer that names the others stays where it is: said, with nothing to press. */
+  await expect(pins.nth(3)).toHaveText("Stays last: it names the others");
+  await expect(card.locator('span[data-dag-quiz-pin="words"]')).toHaveCount(1);
+  /* No tooltip carries what a control means: the tick says it in its name. */
+  await expect(card.locator(".dag-quiz__option [title]:not([data-dag-quiz-remove-option])")).toHaveCount(0);
+
+  await pins.nth(0).click();
+  await expect.poll(() => read("pins")).toContain("- [ ] DESCRIBE {pin}\n");
+  await expect(pins.nth(0)).toHaveText("Kept in place");
+  await pins.nth(2).click();
+  await expect.poll(() => read("pins")).toContain("- [ ] SHOW PLAN\n");
+});
+
+test("Preview draws the question as a run asks it, answerable, and writes nothing", async ({ page }) => {
+  const text = SHUFFLED.replace("title: Drill\n", "title: Drill\nshuffle: true\n");
+  const name = write("preview", text);
+  await page.goto(`/?quiz=${name}`);
+  const card = await openCard(page, "qplan");
+  const mode = card.locator('[role="radiogroup"]');
+  await expect(mode.locator('[data-dag-quiz-preview-choice="edit"]')).toHaveAttribute("aria-checked", "true");
+  await mode.locator('[data-dag-quiz-preview-choice="preview"]').click();
+
+  const preview = card.locator("[data-dag-quiz-preview]");
+  await expect(preview).toBeVisible();
+  await expect(card.locator("[data-dag-quiz-prompt]")).toHaveCount(0);
+  await expect(preview.locator(".dag-run__question")).toHaveText("Which command shows a query's plan?");
+  await expect(preview.locator(".dag-run__hint")).toHaveText("Choose one answer.");
+  const options = preview.locator("[data-dag-run-option]");
+  await expect(options).toHaveCount(4);
+  /* Shuffled as a run would, with the kept answer and the one naming the others where they are. */
+  await expect(preview.locator('[data-dag-run-place="2"]')).toHaveAttribute("data-dag-run-option", "2");
+  await expect(preview.locator('[data-dag-run-place="3"]')).toHaveAttribute("data-dag-run-option", "3");
+  await expect(preview).toContainText("Shuffled, as in a run. Nothing is recorded.");
+
+  const check = preview.locator("[data-dag-quiz-preview-check]");
+  await expect(check).toBeDisabled();
+  await preview.locator('[data-dag-run-option="0"]').click();
+  await check.click();
+  await expect(preview.locator(".dag-run__verdict")).toHaveAttribute("data-dag-run-verdict", "wrong");
+  await expect(preview.locator('[data-dag-run-option="1"]')).toHaveAttribute("data-dag-run-mark", "right");
+  await preview.locator("[data-dag-quiz-preview-again]").click();
+  await expect(preview.locator(".dag-run__verdict")).toHaveCount(0);
+  await preview.locator('[data-dag-run-option="1"]').click();
+  await check.click();
+  await expect(preview.locator(".dag-run__verdict")).toHaveAttribute("data-dag-run-verdict", "right");
+
+  /* The arrows walk the switch; Edit is the form again, with nothing written. */
+  await mode.locator('[data-dag-quiz-preview-choice="preview"]').focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(mode.locator('[data-dag-quiz-preview-choice="edit"]')).toBeFocused();
+  await expect(card.locator("[data-dag-quiz-prompt]")).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(read("preview")).toBe(text);
+
+  /* A flashcard's preview turns the card and asks if it was known. */
+  const flash = write(
+    "flash",
+    "---\ntitle: Cards\n---\n\n## What is a TOAST table for? {#qtoast card}\n\n> Out-of-line storage.\n",
+  );
+  await page.goto(`/?quiz=${flash}`);
+  const front = await openCard(page, "qtoast");
+  await front.locator('[data-dag-quiz-preview-choice="preview"]').click();
+  await front.locator("[data-dag-quiz-preview-reveal]").click();
+  await expect(front.locator("[data-dag-run-model]")).toContainText("Out-of-line storage.");
+  await front.locator('[data-dag-run-judge="right"]').click();
+  await expect(front.locator(".dag-run__verdict")).toHaveAttribute("data-dag-run-verdict", "right");
+  /* Folding goes back to the form. */
+  await front.locator("[data-dag-quiz-fold]").click();
+  await openCard(page, "qtoast");
+  await expect(front.locator("[data-dag-quiz-prompt]")).toBeVisible();
+});
+
+test("under 720px Edit and Preview are in the card's menu", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  const name = write("narrow", SHUFFLED);
+  await page.goto(`/?quiz=${name}`);
+  const card = await openCard(page, "qplan");
+  await expect(card.locator('[role="radiogroup"]')).toBeHidden();
+  await card.locator("[data-dag-quiz-card-more]").click();
+  const menu = card.locator("[data-dag-quiz-card-menu]");
+  /* The first row drawn has the focus: Preview, not a row hidden at this width. */
+  await expect(menu.locator('[data-dag-quiz-preview-item="preview"]')).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(card.locator("[data-dag-quiz-preview]")).toBeVisible();
+  await card.locator("[data-dag-quiz-card-more]").click();
+  await menu.locator('[data-dag-quiz-preview-item="edit"]').click();
+  await expect(card.locator("[data-dag-quiz-prompt]")).toBeVisible();
 });
