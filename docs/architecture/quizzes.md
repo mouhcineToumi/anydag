@@ -108,6 +108,13 @@ Sixteen things are load-bearing:
   open fence — is said at once, since nothing typed into the card fixes it. A card holding text the form has no field for (`Question.stray`) is read-only
   until that text has a place, so an edit cannot rewrite it away. A write that would change the
   shape of the question list other than as asked is refused on its card.
+- **One question is open at a time; the rest fold to a line** (#257): its number, its kind, its
+  words and a summary (`summary()`), or, once it is unfinished, what it lacks in a few words
+  (`brief()` in `problems.ts`, the same `switch`). Opening one folds the last, which leaves it as a
+  press elsewhere would. The count above the list says how many are unfinished, and *Show them*
+  opens each in turn; a search target opens its question's card. A grip moves its question or
+  answer with Alt+↑ and Alt+↓ as well as by dragging, and keeps the focus where the row lands.
+  Duplicate and Delete are in the open card's ⋯ menu.
 - **A question in a run is answered once, and a skip is no answer** (`src/ui/quiz/round.ts`).
   Going back to an answered question shows it read-only, because its answer was recorded the moment
   it was given and a second would count twice; a question left unanswered records nothing, never a
@@ -175,7 +182,11 @@ and `run` — and `dag-run__option--block`, `dag-run__option-text--block`,
 for the builder's kinds and labels (#257), `dag-quiz__label*`, `dag-quiz__menu*`, `dag-quiz__kinds*`,
 `dag-quiz__kind-*`, `dag-quiz__tile*`, `dag-quiz__first*`, `dag-quiz__problems-title`,
 `dag-quiz__problem-list`, `data-dag-quiz-add-menu`, `data-dag-quiz-add-kind`, `data-dag-quiz-first`,
-`data-dag-quiz-empty`, `data-dag-quiz-wants` — and,
+`data-dag-quiz-empty`, `data-dag-quiz-wants`, `dag-quiz__card--folded`, `dag-quiz__row*`,
+`dag-quiz__dot`, `dag-quiz__count*`, `dag-quiz__show`, `dag-quiz__card-more`, `dag-quiz__fold`,
+`data-dag-quiz-folded`, `data-dag-quiz-unfinished`, `data-dag-quiz-row*`, `data-dag-quiz-count`,
+`data-dag-quiz-show-unfinished`, `data-dag-quiz-fold`, `data-dag-quiz-card-more`,
+`data-dag-quiz-card-menu` — and,
 for the builder, `dag-rich-field*` (not `dag-field`, the panel's labels), `dag-blocks--field`,
 `data-dag-field-editor`, `dag-quiz__rich*`, `dag-quiz__placeholder`, `dag-quiz__grip`,
 `dag-quiz__kind`, `dag-quiz__more`, `dag-quiz__fix`, `dag-quiz__stray*`, `dag-quiz__list`,
