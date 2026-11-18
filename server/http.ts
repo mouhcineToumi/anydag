@@ -8,6 +8,7 @@
  */
 
 import type { Context } from "hono";
+import type { z } from "zod";
 
 import { anyKindOf, kindOf, type Kind, type TextKind } from "./names";
 import { Conflict, NotFound, Refused, type Vault, type Version } from "./vault";
@@ -50,14 +51,26 @@ export async function bodyOf(c: Context): Promise<Record<string, unknown>> {
 }
 
 /**
+ * The JSON body read through its schema (`server/schema/`), the one the OpenAPI document is generated
+ * from: `bodyOf`, then each field by the route's own check, which refuses as the route did. A field's
+ * reader throws its `Http` itself, so the first refusal in the order the fields are declared is the
+ * one sent; an issue zod finds on its own (none of `field`'s) is a 400 with zod's sentence.
+ */
+export async function bodyAs<S extends z.ZodType>(c: Context, schema: S): Promise<z.output<S>> {
+  const raw = await bodyOf(c);
+  const read = schema.safeParse(raw);
+  if (read.success) return read.data;
+  throw err(400, read.error.issues[0]?.message ?? "expected a JSON body");
+}
+
+/**
  * The `base` a write carries: the sha1 of the text it was edited from, or `null` when the body has
  * none (absent or `null`), which is the documented "I have not seen it" write. Any other string is
  * compared with the file's sha1 as it is — `""` too, which is a stale base and a 409, never a missing
  * one (#400: an agent passing an unset variable overwrote a person's edit). Anything that is not a
  * string is a 400, not a write with no base.
  */
-export function baseOf(body: Record<string, unknown>): string | null {
-  const base = body.base;
+export function baseFrom(base: unknown): string | null {
   if (base === undefined || base === null) return null;
   if (typeof base !== "string") throw err(400, "`base` is the sha1 the text was read with: a string, or left out");
   return base;

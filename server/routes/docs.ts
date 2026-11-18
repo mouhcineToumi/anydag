@@ -14,22 +14,19 @@ import { setImmediate as yieldNow } from "node:timers/promises";
 
 import type { Context, Hono } from "hono";
 
-import { HUE_ORDER } from "../../src/dsl/ir";
 import { isDay, eventOf, withEvent } from "../../src/note/event";
-import { cleanTitle } from "../../src/note/format";
-import { PROJECT_STATUSES, hueOf, projectOf, projectStatusOf, withProject } from "../../src/note/project";
+import { projectOf, withProject } from "../../src/note/project";
 import { tagKey, tagOf } from "../../src/note/tags";
-import { PRIORITIES, STATUSES, dueOf, indexedTask, priorityOf, statusOf, taskOf, withTask } from "../../src/note/task";
+import { indexedTask, taskOf, withTask } from "../../src/note/task";
 import { inTemplates } from "../../src/note/template";
 import { resolveWikiRefs, titleOf, type Ref } from "../../src/refs/extract";
 import { type WikiCandidate, type WikiIndex, wikiIndexer } from "../../src/refs/wikilinks";
 import type { Session } from "../context";
 import { endsBeforeItStarts, placed, withTitle, withoutTitle, zoneIn } from "../frontmatter";
-import { OPS_SHAPE } from "../handle";
 import { type Doc, grammar, type Over, type Parsed } from "../grammar";
 import type { Entry } from "../parsing";
 import { type Listed, listed, overOfVault } from "../upkeep";
-import { anyKind, baseOf, bodyOf, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
+import { anyKind, bodyAs, err, mustExist, mustRead, outsideComponents, recompute, textKind } from "../http";
 import { extOf, folderOf, leafOf, titleName, type Kind, type TextKind } from "../names";
 import { paced } from "../pace";
 import { mimeOf } from "../uploads";
@@ -39,6 +36,20 @@ import { readPrefs } from "./prefs";
 import { relinking } from "../relink";
 import { graphJson, graphOf } from "../graph";
 import { registryOf } from "../tags";
+import {
+  CreateBody,
+  DeleteBody,
+  DraftBody,
+  EventBody,
+  PatchBody,
+  ProjectBody,
+  PutBody,
+  QuizBody,
+  RenameBody,
+  RetitleBody,
+  TableBody,
+  TaskBody,
+} from "../schema/docs";
 
 const str = (v: unknown): string => (typeof v === "string" ? v : v === undefined || v === null ? "" : String(v));
 const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -374,9 +385,6 @@ function listOf(t: Tree, templates: string | null): Promise<string> {
   return json;
 }
 
-/** The largest draft `POST /__board/diagnostics` will read. */
-const DRAFT_MAX = 4 * 1024 * 1024;
-
 export function docRoutes(app: Hono, s: Session): void {
   app.get("/__board/list", async (c) =>
     c.body(await listOf(await s.vault.tree(), s.vault.templatesFolder()), 200, { "content-type": "application/json" }),
@@ -459,10 +467,7 @@ export function docRoutes(app: Hono, s: Session): void {
   app.post("/__board/patch", async (c) => {
     const name = c.req.query("name") ?? "";
     const current = await mustRead(s.vault, name, "board");
-    const body = await bodyOf(c);
-    const ops = body.ops ?? [];
-    if (!Array.isArray(ops)) throw err(400, OPS_SHAPE);
-    const base = baseOf(body);
+    const { ops, base } = await bodyAs(c, PatchBody);
     if (base !== null && base !== current.base) {
       return c.json({ error: "the board changed underneath this edit", base: current.base, text: current.text }, 409);
     }
@@ -481,16 +486,14 @@ export function docRoutes(app: Hono, s: Session): void {
     const kind = textKind(c.req.query("kind"));
     const name = c.req.query("name") ?? "";
     await mustRead(s.vault, name, kind);
-    const body = await bodyOf(c);
-    if (typeof body.text !== "string") throw err(400, "expected `text`");
-    const after = await s.vault.write(name, kind, body.text, baseOf(body));
+    const body = await bodyAs(c, PutBody);
+    const after = await s.vault.write(name, kind, body.text, body.base);
     return c.json({ base: after.base, text: after.text });
   });
 
   app.post("/__board/create", async (c) => {
-    const body = await bodyOf(c);
-    if (typeof body.text !== "string") throw err(400, "expected `text`");
-    const kind = textKind(body.kind);
+    const body = await bodyAs(c, CreateBody);
+    const kind = body.kind;
     outsideComponents(kind, body.name);
     let text = body.text;
     if (kind === "board") text = await grammar.stamp(text);
@@ -508,9 +511,9 @@ export function docRoutes(app: Hono, s: Session): void {
   });
 
   const rename = (copy: boolean) => async (c: Context) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, RenameBody);
     const name = str(body.name);
-    const kind = anyKind(body.kind);
+    const kind = body.kind;
     await mustExist(s.vault, name, kind);
     const to = body.to === undefined || body.to === null ? name : str(body.to);
     outsideComponents(kind, to);
@@ -531,9 +534,9 @@ export function docRoutes(app: Hono, s: Session): void {
   app.post("/__board/duplicate", rename(true));
 
   app.post("/__board/delete", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, DeleteBody);
     const name = str(body.name);
-    const kind = anyKind(body.kind);
+    const kind = body.kind;
     await mustExist(s.vault, name, kind);
     // Not a delete for good: the file, its images and its id go into the trash entry
     // `trash` names, and `/__board/trash/restore` puts them back. Only the trash deletes for good.
@@ -544,11 +547,9 @@ export function docRoutes(app: Hono, s: Session): void {
   /* -- a title ----------------------------------------------------------------------------- */
 
   app.post("/__board/retitle", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, RetitleBody);
     const name = str(body.name);
-    const kind = anyKind(body.kind);
-    const title = typeof body.title === "string" ? cleanTitle(body.title) : null;
-    if (!title) throw err(400, "expected a non-empty `title`");
+    const { kind, title } = body;
     const follow = body.follow === true;
     // A new title is a new name to every `[[wikilink]]` that names it by title, and with `follow` a
     // new file name too: either way the links that named it are kept naming it (`server/relink.ts`).
@@ -561,28 +562,11 @@ export function docRoutes(app: Hono, s: Session): void {
   /* -- a task, a project, an event -------------------------------------------------------------- */
 
   app.post("/__board/task", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, TaskBody);
     const name = str(body.name);
     const change: Record<string, string | null> = {};
-    if ("status" in body) {
-      const raw = body.status;
-      const status = raw === null ? null : (statusOf(raw) ?? undefined);
-      if (status === undefined) throw err(400, `\`${str(raw)}\` is not a status: ${STATUSES.join(", ")}`);
-      change.status = status;
-    }
-    for (const key of ["due", "start"] as const) {
-      if (!(key in body)) continue;
-      const raw = body[key];
-      const day = raw === null ? null : (dueOf(raw) ?? undefined);
-      if (day === undefined) throw err(400, `\`${str(raw)}\` is not a date: write it YYYY-MM-DD`);
-      change[key] = day;
-    }
-    if ("priority" in body) {
-      const raw = body.priority;
-      const priority = raw === null ? null : (priorityOf(raw) ?? undefined);
-      if (priority === undefined) throw err(400, `\`${str(raw)}\` is not a priority: ${PRIORITIES.join(", ")}`);
-      change.priority = priority;
-    }
+    // Each one read already (`TaskBody`): a field left out is not in `body`.
+    for (const key of ["status", "due", "start", "priority"] as const) if (key in body) change[key] = body[key] ?? null;
     if (!Object.keys(change).length) throw err(400, "expected `status`, `due`, `start` or `priority`");
     const text = await recompute(
       s.vault,
@@ -600,21 +584,12 @@ export function docRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/__board/project", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, ProjectBody);
     const name = str(body.name);
     const change: Record<string, string | null> = {};
-    if ("status" in body) {
-      const raw = body.status;
-      const status = raw === null ? null : (projectStatusOf(raw) ?? undefined);
-      if (status === undefined) throw err(400, `\`${str(raw)}\` is not a project status: ${PROJECT_STATUSES.join(", ")}`);
-      change.project = status;
-    }
-    if ("hue" in body) {
-      const raw = body.hue;
-      const hue = raw === null ? null : (hueOf(raw) ?? undefined);
-      if (hue === undefined) throw err(400, `\`${str(raw)}\` is not a hue: ${HUE_ORDER.join(", ")}`);
-      change.hue = hue;
-    }
+    // Each one read already (`ProjectBody`): a field left out is not in `body`.
+    if ("status" in body) change.project = body.status ?? null;
+    if ("hue" in body) change.hue = body.hue ?? null;
     if (!Object.keys(change).length) throw err(400, "expected `status` or `hue`");
     const text = await recompute(
       s.vault,
@@ -631,7 +606,7 @@ export function docRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/__board/event", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, EventBody);
     const name = str(body.name);
     const change: Record<string, string | null> = {};
     const zone = zoneOf(s);
@@ -711,11 +686,9 @@ export function docRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/__board/table", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, TableBody);
     const name = str(body.name);
-    const ops = body.ops;
-    if (!Array.isArray(ops)) throw err(400, "expected `ops: [{op, …}]`");
-    const base = baseOf(body);
+    const { ops, base } = body;
     for (let i = 0; i < 4; i++) {
       const current = await mustRead(s.vault, name, "table");
       if (base !== null && base !== current.base) {
@@ -746,11 +719,9 @@ export function docRoutes(app: Hono, s: Session): void {
    * loop: with no `base` a write that meets a moved text is recomputed from the text that beat it.
    */
   app.post("/__board/quiz", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, QuizBody);
     const name = str(body.name);
-    const ops = body.ops;
-    if (!Array.isArray(ops) || ops.length === 0) throw err(400, "expected `ops: [{op, …}]`");
-    const base = baseOf(body);
+    const { ops, base } = body;
     for (let i = 0; i < 4; i++) {
       const current = await mustRead(s.vault, name, "quiz");
       if (base !== null && base !== current.base) {
@@ -787,11 +758,8 @@ export function docRoutes(app: Hono, s: Session): void {
    * labels the answer.
    */
   app.post("/__board/diagnostics", async (c) => {
-    const body = await bodyOf(c);
-    if (typeof body.text !== "string") throw err(400, "say what to check: `text`, the draft itself");
-    if (body.text.length > DRAFT_MAX) throw err(413, `a draft is at most ${DRAFT_MAX / (1024 * 1024)} MiB`);
-    const kind = textKind(typeof body.kind === "string" ? body.kind : undefined);
-    if (kind === "note") throw err(400, "a note has no diagnostics: it is Markdown, and any Markdown is a note");
+    const body = await bodyAs(c, DraftBody);
+    const kind = body.kind;
     const name = typeof body.name === "string" && body.name ? body.name : "draft";
     return c.json(await grammar.diagnose(name, body.text, kind));
   });

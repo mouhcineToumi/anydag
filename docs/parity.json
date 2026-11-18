@@ -18,6 +18,14 @@
       "mcp": ["whoami"]
     },
     {
+      "id": "server.openapi",
+      "area": "Account",
+      "what": "The local server's OpenAPI 3.1 document: every route, what it takes and what it answers, refusals included",
+      "rest": ["GET /api/openapi.json"],
+      "cli": {"admin": false},
+      "mcp": {"refused": "An agent over MCP is handed each tool with its own input schema; the document is for a client of the HTTP API, and is committed as docs/api/local.openapi.json."}
+    },
+    {
       "id": "account.settings",
       "area": "Account",
       "what": "The app's preferences — how the window is laid out",

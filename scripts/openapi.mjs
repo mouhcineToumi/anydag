@@ -9,8 +9,8 @@
  *
  * Load-bearing:
  * - **One list, one generator.** A spec is an entry of `SPECS`: the module that makes its document,
- *   the function that does, and the two files it is committed as. The local server's spec (#531) is
- *   one more entry; the builder (`api/openapi/document.ts`) and the renderer (`api/openapi/markdown.ts`)
+ *   the function that does, and the two files it is committed as. The local server's spec is one more
+ *   entry; the builder (`api/openapi/document.ts`) and the renderer (`api/openapi/markdown.ts`)
  *   are shared.
  * - **The document comes from the module, never from a running server**: each entry is bundled with
  *   its packages left outside (as `check-skill.mjs` reads `TOOLS`) and imported, so the check needs
@@ -33,6 +33,13 @@ export const SPECS = [
     make: "syncDocument",
     json: "docs/api/sync.openapi.json",
     reference: "docs/api/sync.md",
+  },
+  {
+    name: "local",
+    module: "./server/openapi",
+    make: "localDocument",
+    json: "docs/api/local.openapi.json",
+    reference: "docs/api/local.md",
   },
 ];
 

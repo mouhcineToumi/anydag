@@ -13,12 +13,10 @@
 
 import type { Hono } from "hono";
 
-import { HUE_ORDER, type Hue } from "../../src/dsl/ir";
-import { hueOf } from "../../src/note/project";
-import { defaultHue, tagKey, tagOf, tagsOf, withTags } from "../../src/note/tags";
+import { defaultHue, tagKey, tagsOf, withTags } from "../../src/note/tags";
 import { inTemplates } from "../../src/note/template";
 import type { Session } from "../context";
-import { Http, bodyOf, err, outsideComponents, recompute, textKind } from "../http";
+import { Http, bodyAs, err, recompute } from "../http";
 import { TEXT_KINDS, type TextKind } from "../names";
 import {
   Unreadable,
@@ -33,29 +31,7 @@ import {
   unregister,
 } from "../tags";
 import { byKind, type Tree } from "../vault";
-
-/** A tag in a body, or the 400 that says what one is. */
-function tagArg(raw: unknown, what: string): string {
-  const tag = tagOf(raw);
-  if (!tag)
-    throw err(400, `\`${String(raw ?? "")}\` is not a tag (${what}): letters, digits, _, - and /, with a letter among them`);
-  return tag;
-}
-
-/** A list of tags in a body: absent is none, and every entry must be one. */
-function tagsArg(raw: unknown, what: string): string[] {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw)) throw err(400, `\`${what}\` is a list of tags`);
-  return raw.map((t) => tagArg(t, what));
-}
-
-/** A hue in a body: one of the ten, or `null` for the default. */
-function hueArg(raw: unknown): Hue | null {
-  if (raw === null) return null;
-  const hue = hueOf(raw);
-  if (!hue) throw err(400, `\`${String(raw)}\` is not a hue: one of ${HUE_ORDER.join(", ")}, or null for the default`);
-  return hue;
-}
+import { ApplyTagsBody, ColorTagBody, DeleteTagBody, RenameTagBody, tagArg } from "../schema/tags";
 
 /** Change the tag list, its refusals as a route's. */
 function tagsChanged(s: Session, edit: Parameters<typeof changeTags>[1]): boolean {
@@ -135,14 +111,7 @@ export function tagRoutes(app: Hono, s: Session): void {
   /* One document's tags: added and taken off, any kind. A tag the vault has never seen is created —
      registered, with `hue` or its default — as typing a new name in the page creates one. */
   app.post("/__board/tags/apply", async (c) => {
-    const body = await bodyOf(c);
-    const name = String(body.name ?? "");
-    const kind = textKind(body.kind ?? "note");
-    outsideComponents(kind, name);
-    const add = tagsArg(body.add, "add");
-    const remove = tagsArg(body.remove, "remove");
-    const hue = "hue" in body ? hueArg(body.hue) : null;
-    if (!add.length && !remove.length) throw err(400, "expected `add`, `remove` or both: lists of tags");
+    const { name, kind, add, remove, hue } = await bodyAs(c, ApplyTagsBody);
     const tree = await s.vault.tree();
     const seen = knownTags(tree, s);
     const fresh = add.filter((t) => !seen.has(tagKey(t)));
@@ -171,10 +140,7 @@ export function tagRoutes(app: Hono, s: Session): void {
      rename that misses a file does not repaint the rest in a default; the old entry goes once nothing
      was missed. */
   app.post("/__board/tags/rename", async (c) => {
-    const body = await bodyOf(c);
-    const from = tagArg(body.from, "from");
-    const to = tagArg(body.to, "to");
-    if (from === to) throw err(400, "`from` and `to` are the same tag");
+    const { from, to } = await bodyAs(c, RenameTagBody);
     const tree = await s.vault.tree();
     const reg = readRegistry(s.vault);
     const same = tagKey(from) === tagKey(to);
@@ -192,8 +158,7 @@ export function tagRoutes(app: Hono, s: Session): void {
   /* Take a tag off every document, and out of the tag list once nothing was missed. The hue it had
      is answered, so *Undo* on an unused tag can put it back with `/color`. */
   app.post("/__board/tags/delete", async (c) => {
-    const body = await bodyOf(c);
-    const tag = tagArg(body.tag, "tag");
+    const { tag } = await bodyAs(c, DeleteTagBody);
     const was = readRegistry(s.vault).get(tagKey(tag));
     const { files, missed } = await across(s, tag, null);
     if (!missed.length) tagsChanged(s, (raw) => unregister(raw, tag));
@@ -202,10 +167,7 @@ export function tagRoutes(app: Hono, s: Session): void {
 
   /* A tag's hue, which registers it: `null` is the default its name hashes to, still registered. */
   app.post("/__board/tags/color", async (c) => {
-    const body = await bodyOf(c);
-    const tag = tagArg(body.tag, "tag");
-    if (!("hue" in body)) throw err(400, "expected `hue`: one of the ten hues, or null for the default");
-    const hue = hueArg(body.hue);
+    const { tag, hue } = await bodyAs(c, ColorTagBody);
     tagsChanged(s, (raw) => setHue(raw, tag, hue));
     const info = readRegistry(s.vault).get(tagKey(tag))!;
     return c.json({ name: info.name, hue: info.hue ?? defaultHue(info.name), registered: true });

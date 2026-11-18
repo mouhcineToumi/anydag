@@ -15,32 +15,12 @@ import type { Hono } from "hono";
 
 import { cleanTitle } from "../../src/note/format";
 import type { Session } from "../context";
-import { bodyOf, err, Http, mustRead, textKind } from "../http";
+import { bodyAs, err, Http, mustRead, textKind } from "../http";
 import { extOf, fileNameFrom, folderFrom, leafOf } from "../names";
 import { byteRange, fileHeaders, megabytes, mimeOf } from "../uploads";
 import { Refused, sha1 } from "../vault";
+import { AssetBody, UploadBody } from "../schema/files";
 import { fileAnswer } from "./docs";
-
-const DATA_URL = /^data:([^;]+);base64,(.+)$/s;
-const IMAGE_EXT: Readonly<Record<string, string>> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "image/svg+xml": "svg",
-  "image/avif": "avif",
-};
-
-/** A base64 data URL as its bytes and extension; `images.py`'s `decode_image`, same refusals. */
-function decodeImage(raw: unknown): { data: Buffer; ext: string } {
-  const m = DATA_URL.exec(typeof raw === "string" ? raw : "");
-  if (!m) throw err(400, "expected a base64 data URL");
-  const ext = IMAGE_EXT[m[1]!];
-  if (!ext) throw err(415, `unsupported image type ${m[1]}`);
-  const body = m[2]!.replace(/\s+/g, "");
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(body) || body.length % 4 === 1) throw err(400, "that image could not be decoded");
-  return { data: Buffer.from(body, "base64"), ext };
-}
 
 /** An item's id as a fence line writes it; `free_item_id`'s scan. */
 const ITEM_ID = /#([\w.-]+)/g;
@@ -115,9 +95,11 @@ async function storeUpload(
   return { ...answer, sha256: sum.digest("hex") };
 }
 
-/** A pasted picture, kept as an attachment in the vault's attachments folder. */
-async function storePasted(s: Session, dataUrl: unknown): Promise<{ id: string; name: string; digest: string }> {
-  const { data, ext } = decodeImage(dataUrl);
+/** A pasted picture, read already (`decodeImage`), kept as an attachment in the vault's attachments folder. */
+async function storePasted(
+  s: Session,
+  { data, ext }: { data: Buffer; ext: string },
+): Promise<{ id: string; name: string; digest: string }> {
   const folder = s.vault.attachments;
   const name = fileNameFrom(folder ? `${folder}/${pastedName(ext)}` : pastedName(ext), s.vault.types);
   if (!name) throw err(415, `\`.${ext}\` files cannot be kept in this vault`);
@@ -178,7 +160,7 @@ export function fileRoutes(app: Hono, s: Session): void {
   app.post("/__board/asset", async (c) => {
     const name = c.req.query("name") ?? "";
     const current = await mustRead(s.vault, name, "board");
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, AssetBody);
     const kept = await storePasted(s, body.dataUrl);
     const itemId = freeItemId(current.text, `image-${kept.digest}`);
     const parts = [`#${itemId}`];
@@ -201,7 +183,7 @@ export function fileRoutes(app: Hono, s: Session): void {
   app.post("/__board/upload", async (c) => {
     const kind = textKind(c.req.query("kind"));
     await mustRead(s.vault, c.req.query("name") ?? "", kind);
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, UploadBody);
     const kept = await storePasted(s, body.dataUrl);
     return c.json({ src: `dag:${kept.id}` });
   });

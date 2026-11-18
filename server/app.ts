@@ -29,6 +29,7 @@ import { defaultHarnesses } from "./chat/harnesses";
 import type { Session } from "./context";
 import { cloudOn } from "./features";
 import { failure } from "./http";
+import { scoped } from "./scope";
 import { chatGuard, chatRoutes } from "./routes/chat";
 import { docRoutes } from "./routes/docs";
 import { eventRoutes } from "./routes/events";
@@ -72,9 +73,6 @@ function ownOrigin(site: string | undefined, origin: string | undefined, host: s
   if (origin !== undefined && origin !== `http://${host ?? ""}`) return false;
   return true;
 }
-
-/** The routes about the app rather than one vault: they answer with no vault open. */
-const UNSCOPED = ["/api/health", "/api/vaults", "/api/settings", "/api/auth/me", "/api/telemetry"];
 
 /** The API under the launch's secret path: `/s/<secret>/__board/…`, `/s/<secret>/api/…`. */
 const UNDER = /^\/s\/([^/]*)(\/.*)?$/;
@@ -278,9 +276,11 @@ function pageApp(root: string | null): Hono {
 
 /**
  * The routes. {@link createApp}'s gate is the only way in, and they hold it to that: a request it did
- * not hand them (`passed`) is a 401 before any route, whatever its path says.
+ * not hand them (`passed`) is a 401 before any route, whatever its path says. Exported only so the
+ * OpenAPI document's test can list what they register (`test/server/openapi.test.ts`): handed an
+ * empty `passed`, they answer nothing but that 401.
  */
-function routes(opts: ServerOptions, passed: WeakSet<Request>): Hono {
+export function routes(opts: ServerOptions, passed: WeakSet<Request>): Hono {
   const s = opts.session;
   /* Read once per app: every route this app serves answers for the same process, whose environment
      does not change beneath it. A second app (a CLI's in-process serve) decides for itself. */
@@ -323,9 +323,7 @@ function routes(opts: ServerOptions, passed: WeakSet<Request>): Hono {
   /* -- which vault: `?vault=<id>`, or the one opened last (`context.ts`) ----------------------- */
 
   app.use("*", async (c, next) => {
-    const p = c.req.path;
-    const scoped = p.startsWith("/__board") || (p.startsWith("/api/") && !UNSCOPED.some((u) => p === u || p.startsWith(`${u}/`)));
-    if (!scoped) return next();
+    if (!scoped(c.req.path)) return next();
     return s.within(c.req.query("vault"), () => next());
   });
 
