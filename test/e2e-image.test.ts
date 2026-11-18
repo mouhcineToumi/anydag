@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
  *
  * The screenshots are made and compared inside `mcr.microsoft.com/playwright:v<version>-noble`: the
  * version `package.json` pins, which `scripts/e2e-docker.sh` reads, and which
- * `.github/workflows/e2e.yml` (and the nightly's bench guard, `nightly.yml`) spells out because a
+ * `.github/workflows/e2e.yml` (and the bench's, `nightly.yml` and `bench.yml`) spells out because a
  * workflow's `container:` cannot read a file. A
  * library bumped without the image — or the other way round — is a browser that draws every
  * baseline a few pixels differently, and a red suite that says nothing about why.
@@ -33,10 +33,13 @@ describe("the Playwright pin", () => {
     for (const v of merges) expect(v).toBe(pinned);
   });
 
-  it("is the version of the image the nightly's bench guard runs in", () => {
-    const yml = fs.readFileSync(".github/workflows/nightly.yml", "utf8");
-    const images = [...yml.matchAll(/mcr\.microsoft\.com\/playwright:v([\d.]+)-noble/g)].map((m) => m[1]);
-    expect(images.length).toBeGreaterThan(0);
-    for (const v of images) expect(v).toBe(pinned);
-  });
+  it.each([".github/workflows/nightly.yml", ".github/workflows/bench.yml"])(
+    "is the version of the image the bench runs in, in %s",
+    (file) => {
+      const yml = fs.readFileSync(file, "utf8");
+      const images = [...yml.matchAll(/mcr\.microsoft\.com\/playwright:v([\d.]+)-noble/g)].map((m) => m[1]);
+      expect(images.length).toBeGreaterThan(0);
+      for (const v of images) expect(v).toBe(pinned);
+    },
+  );
 });

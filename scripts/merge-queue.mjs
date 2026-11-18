@@ -208,6 +208,41 @@ function updateBranch(r, pr) {
   }
 }
 
+/** Re-runs a workflow run's failed jobs; false when the run has not finished, which GitHub refuses. */
+function rerun(id) {
+  try {
+    gh(["run", "rerun", String(id), "--failed"], { quiet: true });
+    return true;
+  } catch (e) {
+    if (/already running|cannot be rerun/i.test(`${e.stdout ?? ""}${e.stderr ?? ""}`)) return false;
+    throw e;
+  }
+}
+
+/**
+ * Brings the branch up to date; `"conflict"` only when it truly conflicts. GitHub can merge the pull
+ * request between the snapshot and the update: it is then one behind its own squash, and the
+ * refused update is not a conflict.
+ */
+function update(r, pr) {
+  const result = updateBranch(r, pr);
+  if (result === "conflict" && fetchPr(r, pr.number).state === "MERGED") return "merged";
+  return result;
+}
+
+/**
+ * Re-runs the failed checks' runs; true when GitHub took every one. A required check can fail while
+ * another job of its workflow run is still going (e2e's verdict before its report), and GitHub
+ * re-runs only a finished run: that one is tried again on the next poll, not counted as the retry.
+ */
+function retry(number, runs) {
+  say(`#${number}: a check failed, running it again (${runs.join(", ")})`);
+  const running = runs.filter((id) => !rerun(id));
+  if (running.length === 0) return true;
+  say(`#${number}: run ${running.join(", ")} is still going; trying again when it ends`);
+  return false;
+}
+
 /** Auto-merge off; GitHub answers an error when it was not on, which is the same outcome. */
 function disableAuto(number) {
   try {
@@ -306,15 +341,12 @@ async function work(r, required, number) {
       case "update": {
         say(`#${number} is ${pr.behind} behind ${BASE}: updating the branch`);
         if (pr.autoMerge) disableAuto(number);
-        const result = updateBranch(r, pr);
-        if (result === "conflict") return prepareConflict(pr);
+        if (update(r, pr) === "conflict") return prepareConflict(pr);
         await sleep(5_000);
         break;
       }
       case "retry":
-        say(`#${number}: a check failed, running it again (${next.runs.join(", ")})`);
-        for (const id of next.runs) gh(["run", "rerun", String(id), "--failed"], { quiet: true });
-        retried = true;
+        retried = retry(number, next.runs);
         await sleep(POLL_MS);
         break;
       case "arm": {
