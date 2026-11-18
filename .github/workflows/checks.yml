@@ -49,10 +49,23 @@ jobs:
     env:
       # `tsc -p desktop` needs Electron's types, not its 100 MB binary.
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      # What `check:duplication` and `check:complexity` compare a change with: the commit the pull
+      # request is based on. The step below fetches it; on a push, a nightly or a release it is
+      # empty and the checks have no change to measure, which they say rather than guess.
+      ANYDAG_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
+      # A checkout is one commit deep, so the base commit is not there, and both waste checks need
+      # it (`scripts/lib/change.mjs`). The event's own base sha, not the branch's tip: the tip may
+      # have moved since the merge ref was made, and a change is measured against the commit it was
+      # written on.
+      - name: The base, for the waste checks
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
       - uses: actions/setup-node@v7
         with:
           node-version: 24

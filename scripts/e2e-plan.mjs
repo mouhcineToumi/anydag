@@ -55,16 +55,34 @@ const RULES = [
   [/\.md$/, "ignore"],
   [/^(docs|\.github|\.githooks|\.claude|test|skills|desktop)\//, "ignore"],
   [
-    /^scripts\/(check-[^/]+|checks\.sh|gate\.sh|hooks\.mjs|parity\.mjs|openapi\.mjs|stamp\.mjs|icons\/.*|api-demo\.sh)$/,
+    /^scripts\/(check-[^/]+|checks\.sh|gate\.sh|hooks\.mjs|parity\.mjs|openapi\.mjs|stamp\.mjs|icons\/.*|api-demo\.sh|lib\/change\.mjs|complexity-baseline\.json)$/,
     "ignore",
   ],
-  [/^(LICENSE[^/]*|CODEOWNERS|\.gitignore|\.gitattributes|\.editorconfig|biome\.jsonc?|renovate\.json|VERSION)$/, "ignore"],
+  [
+    /^(LICENSE[^/]*|CODEOWNERS|\.gitignore|\.gitattributes|\.editorconfig|biome\.jsonc?|\.jscpd\.json|renovate\.json|VERSION)$/,
+    "ignore",
+  ],
 ];
 
 /** The kind of one repository-relative path. */
 export function kindOf(file) {
   for (const [re, kind] of RULES) if (re.test(file)) return kind;
   return "app";
+}
+
+/** What the kinds ask for by themselves: the smoke tier, and the specs a kind or a baseline names. */
+function asked(kinds) {
+  const has = (k) => kinds.has(k);
+  const smoke = has("app") || has("pixels") || has("chrome") || has("sync") || has("harness");
+  const specs = new Set();
+  if (has("pixels")) specs.add("reference.spec.ts");
+  if (has("pixels") || has("chrome")) specs.add("surfaces.spec.ts");
+  if (has("sync")) specs.add("sync.spec.ts");
+  for (const f of kinds.get("snapshot") ?? []) {
+    const m = /^e2e\/([^/]+\.spec\.ts)-snapshots\//.exec(f);
+    if (m) specs.add(m[1]);
+  }
+  return { smoke, specs };
 }
 
 /**
@@ -75,17 +93,7 @@ export function kindOf(file) {
 export function plan(files, tracedSpecs = () => []) {
   const kinds = new Map();
   for (const f of files) kinds.set(kindOf(f), [...(kinds.get(kindOf(f)) ?? []), f]);
-  const has = (k) => kinds.has(k);
-
-  const smoke = has("app") || has("pixels") || has("chrome") || has("sync") || has("harness");
-  const specs = new Set();
-  if (has("pixels")) specs.add("reference.spec.ts");
-  if (has("pixels") || has("chrome")) specs.add("surfaces.spec.ts");
-  if (has("sync")) specs.add("sync.spec.ts");
-  for (const f of kinds.get("snapshot") ?? []) {
-    const m = /^e2e\/([^/]+\.spec\.ts)-snapshots\//.exec(f);
-    if (m) specs.add(m[1]);
-  }
+  const { smoke, specs } = asked(kinds);
   const e2eSide = [...(kinds.get("spec") ?? []), ...(kinds.get("snapshot") ?? [])];
 
   /* A change under `e2e/` that no spec traces to — `global-setup.ts`, which only the config imports —

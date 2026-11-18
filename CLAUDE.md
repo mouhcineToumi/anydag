@@ -187,8 +187,8 @@ card's system prompt), `docs/parity.json` and `docs/PARITY.md`, `skills/anydag/`
 
 The pre-commit hook first runs `scripts/secrets.sh` (gitleaks over the staged change; CI's `secrets`
 job and the nightly run it too). `npm run checks` is the fast tier (Biome lint and format check, knip, typecheck of all three tsconfigs, `check:version`,
-`check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `check:design`, `check:openapi`, `test/parity.test.ts`,
-vitest). It needs no browser and is the pre-commit hook. Pre-push runs `npm run lint:promises` and the
+`check:case`, `check:theme`, `check:literals`, `check:icons`, `check:skill`, `check:design`, `check:openapi`,
+`check:duplication`, `check:complexity`, `test/parity.test.ts`, vitest). It needs no browser and is the pre-commit hook. Pre-push runs `npm run lint:promises` and the
 store's contracts over a watched vault (about 30 s, the two checks only CI used to run). The
 Playwright suite is the slow tier and runs in the pinned Docker image, locally (`npm run e2e:docker`)
 and in CI (`e2e.yml`: on a pull request the `@smoke` tier plus the specs the change reaches, everything on
