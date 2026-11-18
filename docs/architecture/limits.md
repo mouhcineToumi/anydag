@@ -30,6 +30,7 @@ long enough to read as hung, or that is refused.
 | **Diagram size** (`arch` nodes, ELK) | **200** — 0.9 s | **500** — 2.9 s | **1,000** — 8.3 s with nothing drawn until it is done |
 | **Attachment size** | **512 MB**, the limit — streamed both ways (#278): a 500 MB upload 1.1 s, read 0.8 s, a 1 KB range of it 5 ms; the server peaks about 80 MB over its resting size, the same at 100 MB as at 500 | not reached at the limit | **512 MB** — the default limit, `ANYDAG_UPLOAD_MAX_MB`; above it a `413` in 6 ms |
 | **Note size** (words) | **1,000** — 0.5 s | **100,000** (≈ 600 KB) — 2.0 s | not reached at 100,000 |
+| **Editing** (an action, from the input to written and drawn; *Editing*) | **1,000** — every action under 0.15 s, and the note's save its 250 ms debounce and a few ms | **10,000** — a rename 0.6 s and a move 0.5 s (#541); a new file 0.2 s; a card's edit, undo and the note's save the same as at 100 | **50,000** — a rename 3.8 s and a move 3.5 s (#541), a new file 0.9–1.1 s (#542), a delete 1.6 s (#543); a card's edit, undo and the note's save still the same |
 
 The vault limit is set by three things that scale with the vault rather than with what changed —
 search (#282, and #267's index), the listing and references index (cold only since #280: warm, each
@@ -115,6 +116,47 @@ are read, parsed and their links resolved again (`search.md`, `server.md`).
 | `/__board/search` cold · warm | 2.3 s · 53 ms | 22.6 s · 513 ms | 113 s · 2.8 s |
 | a note opened in the page, to `data-dag-ready` | 0.7 s | 1.1 s | 3.4 s |
 | the search card's first match · next query | 0.8 s · 18 ms | 4.2 s · 111 ms | 20.0 s · 221 ms |
+
+### Editing (#527)
+
+What a person waits on while editing, in the built page (`edit.<n>.*`): each action is timed from the
+input to the moment the page shows it, the file on disk holds it, and every write the page sent for it
+has been answered. Measured on 2026-11-18 by `node scripts/bench.mjs --only edit`, on a different
+machine from the rest of this file: an Intel i7-10510U laptop, 4 cores and 8 threads, 7 GB, Linux 7.2
+(Omarchy), Node 26.8, Chromium 158, the vaults on a tmpfs, load average 0.3 to 2.7 while it ran (the
+bench's own). Median of five, after one unrecorded:
+
+| `edit.<n>.` | 100 files | 1k | 10k | 50k |
+|---|---|---|---|---|
+| `create.note`: the sidebar's New → Note, the click to the file made and its title holding the caret | 60 ms | 74 ms | 204 ms | **868 ms** |
+| `create.task` | 62 ms | 82 ms | 215 ms | **896 ms** |
+| `create.board`: … to the empty board's card drawn | 43 ms | 59 ms | 175 ms | **1.1 s** |
+| `create.table`: … to the grid drawn | 53 ms | 65 ms | 194 ms | **1.1 s** |
+| `note.save`: the last key typed to the save on disk, the 250 ms debounce included | 265 ms | 264 ms | 257 ms | 257 ms |
+| `card.retype`: a card's name retyped where it is drawn, Enter to the file and the drawing | 28 ms | 28 ms | 29 ms | 29 ms |
+| `card.move`: a text card dragged, the pointer let go to the file | 21 ms | 17 ms | 16 ms | 17 ms |
+| `card.connect`: a card's handle pulled onto another, let go to the edge written and drawn | 31 ms | 32 ms | 32 ms | 33 ms |
+| `undo`: ctrl+Z on that connect, to the edge gone from the file and the drawing | 31 ms | 30 ms | 35 ms | 36 ms |
+| `file.rename`: a note renamed from its sidebar row, Enter to the file moved and the row drawn | 112 ms | 145 ms | 612 ms | **3.8 s** |
+| `file.move`: the open note moved into a folder from its row, to the file moved and the page on it | 57 ms | 91 ms | 516 ms | **3.5 s** |
+| `file.delete`: the open note deleted from its row, to the file in the trash and the notice up | 61 ms | 75 ms | 229 ms | **1.6 s** |
+
+**What happens inside a file does not depend on the vault; what happens to a file does.** A card's
+edit, its undo and a note's save cost the same at 100 files as at 50,000, because each is a patch to
+one file and a re-render of one board. A new file, a rename, a move and a delete each grow with the
+vault. The note on each line says which of the three came last, and it differs between them:
+
+- **A rename and a move wait on the server's answer**: at 50k files the file has moved 0.36–0.46 s
+  after the input, and the server answers after 3.0–3.5 s (0.43 s at 10k). The note had no links to
+  rewrite, so the time is the step around the rename, not the rewriting. #541.
+- **A new file waits on the page**: the server answers the create in 13 ms at 100 files and 244–315 ms
+  at 50k, and the page draws the new file 0.6–0.8 s after that. #542.
+- **A delete waits on the page too**: in the trash and answered in 0.45 s at 50k, and the notice is
+  up 1.1 s later. #543.
+
+The note's save is its debounce: `SAVE_MS` (`src/ui/docFile.ts`) is 250 ms, and the save is on disk
+6–15 ms after it fires. Its five rounds are within 10 ms of each other at every size, which makes it
+the steadiest number the bench has. The pull request's check is built around that (*The bench*).
 
 ### The search index (#267)
 
@@ -371,8 +413,9 @@ files, 4.8 s at 5,000, and 14 s on the dense vault, whose 150,000 `[[wikilinks]]
 
 ## The bench
 
-`scripts/bench.mjs` makes every measurement above in one run (about 25 minutes, most of it the 50k
-vault); `--quick` is a minute or two. Its header is the reference: the flags, the output format
+`scripts/bench.mjs` makes every measurement above in one run (about half an hour, most of it the 50k
+vault; `edit` adds five minutes of it); `--quick` is a few minutes, and `--only edit --quick` about one
+and a half. Its header is the reference: the flags, the output format
 (`<metric>  <value> <unit>  # note`, plus `--json`), and what each group measures and how. Four
 rules it keeps:
 
@@ -390,6 +433,13 @@ rules it keeps:
   empty board that pays for the page's own chunks.
 - **CPU and memory are per process** — `/proc/<pid>/stat` and `status` on Linux, the Chromium tree
   walked from the browser's pid, Electron's from `app.getAppMetrics()` — never a whole-machine figure.
+- **An edit is timed from a raw input to the last of three things** (`edit.*`, #527): the page showing
+  it (a test run in the page every frame), the file on disk holding it (read every 4 ms), and every
+  `POST` the page sent for it answered. The input is a raw mouse or key event at a point measured
+  beforehand, never Playwright's `click()`, which waits two frames for the element to be still and
+  would put that wait in the number. Each action runs once unrecorded, which pays for its chunk and
+  its first layout, then five times, and the median is the number. The note gives the spread and when
+  each of the three came, so a slower action says which side slowed.
 
 **The release table** (`node scripts/bench.mjs --release`) is the one table a release carries (#328):
 ten fixed rows — startup to a drawn board, the page's first search, the server's memory at rest, the
@@ -710,4 +760,64 @@ desktop.startup.50000.cold.first-window  539 ms            # first launch, fresh
 desktop.startup.50000.cold.ready         1217 ms           # launch to a 20-item board drawn, 50000-file vault
 desktop.startup.50000.warm.first-window  412 ms            # second launch, same app home
 desktop.startup.50000.warm.ready         1080 ms           # launch to a 20-item board drawn, 50000-file vault
+```
+
+The `edit.*` lines, from `node scripts/bench.mjs --only edit`, 2026-11-18, on the machine of *Editing*:
+
+```text
+# AnyDag bench · 2026-11-18T13:33:30.721Z
+# Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz · 8 cores · 7 GB · Linux 7.2.5-3-omarchy (Omarchy) · x64 · Node v26.8.2
+# Chromium 158.0.8127.18
+# edit.100: vault generated in 8 ms
+edit.100.card.retype                     27.8 ms           # a card's name retyped where it is drawn: Enter to the file and the drawing; median of 5, 27–28; file 12, page 28, answered 13
+edit.100.card.move                       20.8 ms           # a text card dragged 96 px: the pointer let go to the file; median of 5, 12–26; file 20, page 0, answered 21
+edit.100.card.connect                    30.5 ms           # a card's handle pulled onto another in its diagram: let go to the edge written and drawn; median of 5, 28–31; file 14, page 31, answered 19
+edit.100.undo                            30.6 ms           # ctrl+Z on that connect: the key to the edge gone from the file and the drawing; median of 5, 27–33; file 7, page 31, answered 16
+edit.100.note.save                       265 ms            # typing at the end of a note: the last key to the save written (a 250 ms debounce included); median of 5, 258–267; file 261, page 0, answered 265
+edit.100.create.note                     60.2 ms           # the sidebar's New → note: the click to the file made and open, ready for its name; median of 5, 53–66; file 11, page 60, answered 13
+edit.100.create.task                     61.5 ms           # the sidebar's New → task: the click to the file made and open, ready for its name; median of 5, 60–71; file 11, page 61, answered 14
+edit.100.create.board                    43.2 ms           # the sidebar's New → board: the click to the file made and open, ready for its name; median of 5, 43–51; file 11, page 43, answered 14
+edit.100.create.table                    52.5 ms           # the sidebar's New → table: the click to the file made and open, ready for its name; median of 5, 51–58; file 12, page 53, answered 14
+edit.100.file.rename                     112 ms            # a note renamed from its row in the sidebar: Enter to the file moved and the row drawn; median of 5, 107–117; file 22, page 112, answered 29
+edit.100.file.move                       57.4 ms           # the open note moved into a folder from its row's Move to…: the choice to the file moved and the page on it; median of 5, 55–59; file 22, page 57, answered 26
+edit.100.file.delete                     60.6 ms           # the open note deleted from its row: the click to the file in the trash and the notice up; median of 5, 58–64; file 18, page 61, answered 22
+# edit.1000: vault generated in 57 ms
+edit.1000.card.retype                    27.5 ms           # a card's name retyped where it is drawn: Enter to the file and the drawing; median of 5, 25–28; file 13, page 27, answered 13
+edit.1000.card.move                      16.5 ms           # a text card dragged 96 px: the pointer let go to the file; median of 5, 15–23; file 13, page 0, answered 16
+edit.1000.card.connect                   31.5 ms           # a card's handle pulled onto another in its diagram: let go to the edge written and drawn; median of 5, 30–45; file 15, page 31, answered 19
+edit.1000.undo                           30.3 ms           # ctrl+Z on that connect: the key to the edge gone from the file and the drawing; median of 5, 28–37; file 8, page 30, answered 16
+edit.1000.note.save                      264 ms            # typing at the end of a note: the last key to the save written (a 250 ms debounce included); median of 5, 259–265; file 260, page 0, answered 264
+edit.1000.create.note                    74 ms             # the sidebar's New → note: the click to the file made and open, ready for its name; median of 5, 68–75; file 14, page 74, answered 16
+edit.1000.create.task                    81.5 ms           # the sidebar's New → task: the click to the file made and open, ready for its name; median of 5, 77–88; file 15, page 81, answered 18
+edit.1000.create.board                   58.9 ms           # the sidebar's New → board: the click to the file made and open, ready for its name; median of 5, 52–64; file 14, page 59, answered 17
+edit.1000.create.table                   65.2 ms           # the sidebar's New → table: the click to the file made and open, ready for its name; median of 5, 63–71; file 16, page 65, answered 18
+edit.1000.file.rename                    145 ms            # a note renamed from its row in the sidebar: Enter to the file moved and the row drawn; median of 5, 144–146; file 28, page 145, answered 58
+edit.1000.file.move                      91.3 ms           # the open note moved into a folder from its row's Move to…: the choice to the file moved and the page on it; median of 5, 57–101; file 29, page 91, answered 58
+edit.1000.file.delete                    74.5 ms           # the open note deleted from its row: the click to the file in the trash and the notice up; median of 5, 71–120; file 22, page 75, answered 25
+# edit.10000: vault generated in 438 ms
+edit.10000.card.retype                   29.3 ms           # a card's name retyped where it is drawn: Enter to the file and the drawing; median of 5, 27–31; file 11, page 29, answered 14
+edit.10000.card.move                     16 ms             # a text card dragged 96 px: the pointer let go to the file; median of 5, 16–17; file 13, page 0, answered 16
+edit.10000.card.connect                  32 ms             # a card's handle pulled onto another in its diagram: let go to the edge written and drawn; median of 5, 32–32; file 5, page 32, answered 16
+edit.10000.undo                          35 ms             # ctrl+Z on that connect: the key to the edge gone from the file and the drawing; median of 5, 32–36; file 10, page 35, answered 21
+edit.10000.note.save                     257 ms            # typing at the end of a note: the last key to the save written (a 250 ms debounce included); median of 5, 256–257; file 256, page 0, answered 257
+edit.10000.create.note                   204 ms            # the sidebar's New → note: the click to the file made and open, ready for its name; median of 5, 189–224; file 52, page 204, answered 55
+edit.10000.create.task                   215 ms            # the sidebar's New → task: the click to the file made and open, ready for its name; median of 5, 203–222; file 52, page 215, answered 55
+edit.10000.create.board                  175 ms            # the sidebar's New → board: the click to the file made and open, ready for its name; median of 5, 137–185; file 52, page 175, answered 56
+edit.10000.create.table                  194 ms            # the sidebar's New → table: the click to the file made and open, ready for its name; median of 5, 180–259; file 50, page 194, answered 53
+edit.10000.file.rename                   612 ms            # a note renamed from its row in the sidebar: Enter to the file moved and the row drawn; median of 5, 596–620; file 58, page 612, answered 429
+edit.10000.file.move                     516 ms            # the open note moved into a folder from its row's Move to…: the choice to the file moved and the page on it; median of 5, 509–521; file 70, page 516, answered 429
+edit.10000.file.delete                   229 ms            # the open note deleted from its row: the click to the file in the trash and the notice up; median of 5, 215–268; file 63, page 229, answered 70
+# edit.50000: vault generated in 1857 ms
+edit.50000.card.retype                   28.9 ms           # a card's name retyped where it is drawn: Enter to the file and the drawing; median of 5, 26–30; file 12, page 29, answered 13
+edit.50000.card.move                     17 ms             # a text card dragged 96 px: the pointer let go to the file; median of 5, 15–19; file 10, page 0, answered 17
+edit.50000.card.connect                  33 ms             # a card's handle pulled onto another in its diagram: let go to the edge written and drawn; median of 5, 33–66; file 8, page 33, answered 17
+edit.50000.undo                          35.8 ms           # ctrl+Z on that connect: the key to the edge gone from the file and the drawing; median of 5, 27–37; file 9, page 36, answered 21
+edit.50000.note.save                     257 ms            # typing at the end of a note: the last key to the save written (a 250 ms debounce included); median of 5, 257–258; file 257, page 0, answered 257
+edit.50000.create.note                   868 ms            # the sidebar's New → note: the click to the file made and open, ready for its name; median of 5, 808–906; file 241, page 868, answered 244
+edit.50000.create.task                   896 ms            # the sidebar's New → task: the click to the file made and open, ready for its name; median of 5, 879–999; file 252, page 896, answered 256
+edit.50000.create.board                  1115 ms           # the sidebar's New → board: the click to the file made and open, ready for its name; median of 5, 849–1385; file 261, page 1115, answered 266
+edit.50000.create.table                  1099 ms           # the sidebar's New → table: the click to the file made and open, ready for its name; median of 5, 818–1618; file 311, page 1099, answered 315
+edit.50000.file.rename                   3766 ms           # a note renamed from its row in the sidebar: Enter to the file moved and the row drawn; median of 5, 3709–4743; file 357, page 3766, answered 2960
+edit.50000.file.move                     3476 ms           # the open note moved into a folder from its row's Move to…: the choice to the file moved and the page on it; median of 5, 3016–4089; file 462, page 1650, answered 3476
+edit.50000.file.delete                   1577 ms           # the open note deleted from its row: the click to the file in the trash and the notice up; median of 5, 1178–3315; file 430, page 1577, answered 450
 ```
