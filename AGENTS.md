@@ -59,9 +59,13 @@ the maintainer sets the label. An issue with no `agent:` label is not ready.
   commits, PR descriptions or comments.
 - Only the owner can merge, so every PR from someone else goes through the owner's review. Address
   review comments with new commits on the same branch; do not force-push over a review in progress.
-- **Merge with auto-merge, never by watching.** Once a PR is open, `gh pr merge --auto --squash`
-  (`--merge` for a release or back-merge PR) lands it when the required checks pass. Do not poll its
-  checks to merge it by hand, and do not `--admin` past a red one: fix the cause, push, and it merges.
+- **Land it through the merge queue, never by merging it yourself.** Once a PR is open and its checks
+  are green, label it `queue` (`gh pr edit <n> --add-label queue`) and move on. The queue
+  (`scripts/merge-queue.mjs`, the `merge-queue` skill) brings each PR up to date with `develop` in
+  turn and merges it when its checks pass there. Do not turn on auto-merge, do not update a queued
+  branch from `develop` yourself (the queue does it in order, and an update by hand restarts CI for
+  nothing), and do not `--admin` past a red check: fix the cause, push, and label it again if the
+  queue took it out.
 
 ## Before you push
 

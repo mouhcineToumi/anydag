@@ -259,8 +259,9 @@ release note, so write it for someone reading a changelog.
 
 - **Only the maintainer can merge**, so every PR from someone else is merged after the
   maintainer has reviewed it (the code owner of everything, see [`.github/CODEOWNERS`](.github/CODEOWNERS)).
-  The maintainer's own PRs merge by **auto-merge**: armed when the PR opens, they land when the
-  required checks pass, with no approval to wait for.
+  The maintainer's own PRs, and an outside one once reviewed, go through the **merge queue**:
+  labelled `queue`, each is brought up to date with `develop` in turn and lands when the required
+  checks pass on it, with no approval to wait for.
 - The maintainer reviews in their own time. If you have heard nothing for a while, a polite nudge on the
   PR is welcome.
 - Review is about the code, never the person. Feedback is concrete and may ask for a smaller PR, a

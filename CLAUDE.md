@@ -193,5 +193,7 @@ a push); `ANYDAG_PREPUSH_E2E=1 git push` runs a pull request's selection before 
 
 Only pick up an issue labelled `status: ready`; branch from `develop` as `feat/<issue>-<slug>`,
 `fix/…`, `docs/…` and so on; open the PR against `develop` with a Conventional Commits title and
-`Closes #<issue>`. Never commit to `main` or `develop` directly. The full rules are in
+`Closes #<issue>`. When it is green, label it `queue`: the merge queue lands it
+(*The merge queue* in `gate-and-releases.md`); never merge it or update it from `develop` yourself.
+Never commit to `main` or `develop` directly. The full rules are in
 [`AGENTS.md`](AGENTS.md) (short) and [`CONTRIBUTING.md`](CONTRIBUTING.md) (complete).
