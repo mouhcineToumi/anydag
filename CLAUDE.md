@@ -53,6 +53,8 @@ the app's home).
 - `node scripts/snapshot.mjs <board>` — render a board and print its diagnostics.
 - `node scripts/bench.mjs [--quick]` — measure memory, CPU and timings on synthetic vaults (`docs/architecture/limits.md`).
 - `node scripts/release-report.mjs <version>` — write and print a stable release's development health report (`docs/metrics/README.md`).
+- `node scripts/visual-review.mjs <pr>` / `--all` — the local, agent-driven visual review of a pull request's chrome, or
+  of the whole app; driven by the `visual-review` skill, never in CI (*The visual review* in `gate-and-releases.md`).
 
 ## The layers, and what each may not know
 
