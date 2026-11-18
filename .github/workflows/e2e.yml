@@ -4,6 +4,8 @@
 #                                                   `@smoke` tier, plus the specs `scripts/e2e-plan.mjs`
 #                                                   names for it — the selection `.githooks/pre-push`
 #                                                   used to run — sharded three ways
+#   …labelled `queue` when the run starts           the whole suite, sharded four ways: what the merge
+#                                                   queue lands is what it ran (#560)
 #   push to develop or release/**                   the whole suite, sharded four ways; a burst of
 #                                                   merges runs it once for the newest, not once each
 #   workflow_call / workflow_dispatch               `scope: smoke | full`, for the nightly and
@@ -13,6 +15,15 @@
 # (#258). A shard is 47 s of fixed cost — pulling the image, `npm ci`, starting the dev server — and
 # the smoke tier was 86 s of tests behind it on one job; three shards cut that to about thirty, and
 # `e2e` no longer waits for the merged HTML report, which nothing needs before the check is green.
+#
+# **A queued pull request runs the whole suite.** The selection misses what a change reaches through
+# the page rather than an import: #540 folded the quiz's questions and broke `touch-targets.spec.ts`,
+# which its selection never ran, and only the push to `develop` found it — after it had landed. So a
+# run that starts while the pull request carries the `queue` label (the merge queue's *update branch*
+# of the front one, or a re-run the queue asks for) runs everything. The label is read when the run
+# starts, not from the event, so a re-run of an older run reads it too. It costs about three minutes
+# a landing: the `e2e` check took a median 5.3 min (p90 6.2) on the full suite against 2.2 (p90 3.3)
+# for a selection, over 28 and 26 runs before 2026-11-18.
 #
 # **The image is the pin.** `mcr.microsoft.com/playwright:v<version>-noble` carries one Chromium
 # build and one set of system fonts, so a baseline taken in `npm run e2e:docker` on a laptop is the
@@ -76,6 +87,10 @@ jobs:
     name: plan
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # The pull request's labels, read when the run starts (a `queue` label asks for the whole suite).
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       run: ${{ steps.plan.outputs.run }}
       scope: ${{ steps.plan.outputs.scope }}
@@ -93,6 +108,9 @@ jobs:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PUSH_BEFORE: ${{ github.event.before }}
           PUSH_HEAD: ${{ github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           # Browsers shared out across the jobs (Playwright shards by test, not by file): a pull
           # request's selection or the smoke tier three ways, about thirty seconds of tests each
           # behind a shard's fixed 47 s; the full suite four ways.
@@ -102,6 +120,17 @@ jobs:
           scope="$INPUT_SCOPE"
           if [ -z "$scope" ]; then
             if [ "$EVENT" = pull_request ]; then scope=changed; else scope=full; fi
+          fi
+          # Queued: the merge queue lands this commit, so it runs everything. Asked of the API rather
+          # than the event, whose labels are the ones it had when it was first pushed.
+          if [ "$scope" = changed ]; then
+            if ! labels="$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')"; then
+              echo "::error::could not read pull request #$PR_NUMBER's labels"; exit 1
+            fi
+            if printf '%s\n' "$labels" | grep -qx queue; then
+              scope=full
+              echo "e2e: #$PR_NUMBER is in the merge queue, so the whole suite runs"
+            fi
           fi
           case "$scope" in
             changed | smoke | full) ;;

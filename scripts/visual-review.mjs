@@ -43,6 +43,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { compare, decode, encode } from "./lib/png.mjs";
+import { lock } from "./lib/lock.mjs";
 
 /** The paths whose change can change how the chrome looks: a pull request touching none is skipped. */
 export const CHROME = [
@@ -239,19 +240,8 @@ function stateDir() {
   return dir;
 }
 
-function lock() {
-  const file = path.join(stateDir(), "lock");
-  try {
-    const pid = Number(fs.readFileSync(file, "utf8"));
-    process.kill(pid, 0);
-    say(`already running (pid ${pid})`);
-    process.exit(1);
-  } catch {
-    /* no lock, or its runner is gone */
-  }
-  fs.writeFileSync(file, String(process.pid));
-  process.on("exit", () => fs.rmSync(file, { force: true }));
-  for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(130));
+function takeLock() {
+  lock(path.join(stateDir(), "lock"), say);
 }
 
 /* ── Capture ────────────────────────────────────────────────────────────────────────────────── */
@@ -336,7 +326,7 @@ function capture(n, { fresh }) {
       return summary(kept, manifestPath);
     }
   }
-  lock();
+  takeLock();
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   const failed = [];
@@ -398,7 +388,7 @@ function audit(ref) {
   if (remote === "origin" && branch.length) git(["fetch", "--quiet", "origin", branch.join("/")]);
   const sha = git(["rev-parse", `${ref}^{commit}`]);
   const dir = path.join(stateDir(), `audit-${new Date().toISOString().slice(0, 10)}-${sha.slice(0, 7)}`);
-  lock();
+  takeLock();
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   const after = render(worktree("head", sha), path.join(dir, "after"), "after");

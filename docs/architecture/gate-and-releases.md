@@ -45,7 +45,7 @@ each green on an old `develop` merged and broke it together (one push run in eig
 week before), and agents caught up by merging `develop` in by hand, restarting CI each time. GitHub's
 own merge queue is offered only to repositories an organization owns, so the queue is
 `scripts/merge-queue.mjs`, run from the maintainer's machine, with the `merge-queue` skill
-(`.claude/skills/merge-queue/`) as its driver. Three parts:
+(`.claude/skills/merge-queue/`) as its driver. Three parts, and three lessons from its first batch:
 
 - **The ruleset requires a branch to be up to date with `develop`** (`strict_required_status_checks_policy`).
   GitHub refuses a merge that was not tested on the current `develop`, whoever asks — the queue is
@@ -66,9 +66,42 @@ own merge queue is offered only to repositories an organization owns, so the que
   hands the pull request back instead when its issue is `agent: deep`, the branch is on a fork, or the
   conflict is in the write path, sync, undo, the gate or layout — the list is in the skill.
 
+What the first batch (0.9.0, thirteen pull requests on 2026-11-18) needed a person for, and the
+queue now does (#560):
+
+- **A pull request that changes the gate lands last, alone.** #546 added two checks to the fast tier
+  with four pull requests queued behind it; each then failed a check that did not exist when it went
+  green, and was ejected and fixed by hand, and its complexity baseline, taken before the rest
+  landed, read their functions as new. A pull request that touches `scripts/checks.sh` or a
+  `*-baseline.json` is now held while anything else is queued (the log says so, and `status` lists it
+  last), and gate changes among themselves keep their order. One that carries a baseline stops the
+  queue once it is up to date (exit 4): the skill retakes the baseline in a worktree on that
+  `develop`, commits it as `chore: retake … baseline` — the commit the queue looks for at the branch's
+  head — and pushes. A pull request adding a **required job** to a workflow is not seen by the script:
+  queue it by hand when the queue is empty.
+- **A stacked branch is rebased, not merged.** #540 and #545 were stacked on #533; once #533 landed
+  as a squash, *update branch* conflicted in about a dozen files, because the branches still carried
+  its commits. When the front pull request is behind and its branch holds the head of a merged pull
+  request that `develop` does not (the squash's source), the queue rebases the branch's own commits
+  (`git rebase --onto origin/develop <that head>`), force-pushes with a lease on the head it read,
+  and comments on the pull request — the one force-push it makes. A conflict stops it with the rebase
+  half done in the worktree (exit 3, `kind: "rebase"`); a fork, or nothing left of the branch's own,
+  takes the pull request out.
+- **What lands ran the whole browser suite.** A pull request's selection is the `@smoke` tier plus
+  the specs `scripts/e2e-plan.mjs` traces to the change, and misses what a change reaches through the
+  page: #540 broke `e2e/touch-targets.spec.ts` and #545 shipped an undersized switch, found only by the
+  whole suite after they landed. `e2e.yml` now runs everything for a pull request labelled `queue`
+  when the run starts (the label is read from the API, so a re-run reads it too); the front pull
+  request's *update branch* starts that run, and one already up to date when it reached the front has
+  its last run started again, whole, before auto-merge goes on (auto-merge stays off while the latest
+  `e2e` run is a selection). Measured before it landed: the `e2e` check took a median 5.3 min (p90
+  6.2) for the whole suite in four shards, against 2.2 (p90 3.3) for a selection in three — about
+  three minutes more a landing, and a push to a queued pull request that is not at the front pays it
+  too.
+
 The queue works one pull request at a time, so a burst lands in sequence, one CI run on the updated
-branch apart (about two minutes at the median, fourteen at worst); it buys a green `develop`, not
-speed. One runner at a time: a lock in the git directory.
+branch apart (about five minutes at the median with the whole suite, fourteen at worst); it buys a
+green `develop`, not speed. One runner at a time: a lock in the git directory.
 
 **The visual review** (#528) is the merge queue's pattern applied to how the app looks: a script
 on the maintainer's machine, `scripts/visual-review.mjs`, driven by the `visual-review` skill
@@ -287,7 +320,7 @@ beside its title and gets no pin. See *A page that names no vault lands in the s
 | Workflow | Runs | On |
 |---|---|---|
 | `ci.yml` → `CI passed` | the fast tier (`checks.yml`: `fast tier` — `checks.sh static` —, `unit` and the watched store contracts, as three jobs side by side) and `promises`; the desktop app (`desktop-build.yml`) on Linux when something it is built from changed, on all three systems for `main`, `release/**` and `hotfix/**`; actionlint when a workflow changed | pull requests into and pushes to `develop`, `main`, `release/**`, `hotfix/**` |
-| `e2e.yml` → `e2e` | on a pull request, what the change can reach (`scope: changed`: the `@smoke` tier plus the specs `scripts/e2e-plan.mjs` names), sharded three ways; the whole suite sharded four ways on a push, one run at a time per branch with only the newest push waiting; the shards' reports merged into one, off the path to `e2e` | the same branches; `workflow_call` with `scope: smoke \| full` |
+| `e2e.yml` → `e2e` | on a pull request, what the change can reach (`scope: changed`: the `@smoke` tier plus the specs `scripts/e2e-plan.mjs` names), sharded three ways — the whole suite when it is labelled `queue` as the run starts, so what the merge queue lands ran everything; the whole suite sharded four ways on a push, one run at a time per branch with only the newest push waiting; the shards' reports merged into one, off the path to `e2e` | the same branches; `workflow_call` with `scope: smoke \| full` |
 | `ci.yml` → `secrets` (in `CI passed`) | gitleaks over the commits the pull request or push adds; the selftest first | the same events as `ci.yml` |
 | `pr-policy.yml` → `PR title`, `PR target`, `Linked issue` | a Conventional Commit title; `main` only from `release/*` or `hotfix/*`; a pull request into develop closes a `status: ready` issue (the owner, bots and a PR labelled `no-issue` exempt) | every pull request event, including an edit or a label |
 | `nightly.yml`, `release.yml`, `cut-release.yml` | see *Versions and releases* | a schedule, a tag, a button |
