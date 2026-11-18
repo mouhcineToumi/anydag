@@ -208,6 +208,17 @@ function updateBranch(r, pr) {
   }
 }
 
+/** Re-runs a workflow run's failed jobs; false when the run has not finished, which GitHub refuses. */
+function rerun(id) {
+  try {
+    gh(["run", "rerun", String(id), "--failed"], { quiet: true });
+    return true;
+  } catch (e) {
+    if (/already running|cannot be rerun/i.test(`${e.stdout ?? ""}${e.stderr ?? ""}`)) return false;
+    throw e;
+  }
+}
+
 /** Auto-merge off; GitHub answers an error when it was not on, which is the same outcome. */
 function disableAuto(number) {
   try {
@@ -311,12 +322,16 @@ async function work(r, required, number) {
         await sleep(5_000);
         break;
       }
-      case "retry":
+      case "retry": {
         say(`#${number}: a check failed, running it again (${next.runs.join(", ")})`);
-        for (const id of next.runs) gh(["run", "rerun", String(id), "--failed"], { quiet: true });
-        retried = true;
+        /* A required check can fail while another job of its workflow run is still going (e2e's
+           verdict before its report), and GitHub re-runs only a finished run: wait for it, then try. */
+        const running = next.runs.filter((id) => !rerun(id));
+        if (running.length > 0) say(`#${number}: run ${running.join(", ")} is still going; trying again when it ends`);
+        else retried = true;
         await sleep(POLL_MS);
         break;
+      }
       case "arm": {
         const method = MERGE_COMMIT.test(pr.head) ? "--merge" : "--squash";
         say(`#${number}: auto-merge on at ${sha.slice(0, 7)} (${method.slice(2)})`);
