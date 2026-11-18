@@ -375,7 +375,7 @@ async function run({ watch }) {
         disableAuto(pr.number);
       }
     }
-    say(`#${front.number} at the front (${rest.length} behind): ${front.title}`);
+    say(`#${front.number} at the front, ${rest.length} more queued: ${front.title}`);
     const conflict = await work(r, required, front.number);
     if (conflict) {
       console.log(JSON.stringify(conflict, null, 2));
