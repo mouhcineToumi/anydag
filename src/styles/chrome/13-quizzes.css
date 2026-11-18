@@ -213,6 +213,75 @@
   border: 1px solid var(--dag-color-outlineSoft);
   border-radius: var(--dag-ui-radius-surface);
 }
+/*
+ * A folded question: one line — its grip, its number, its kind, its words, and what it lacks or a
+ * short summary (#257). Only one card is open at a time, so a long quiz is a short list.
+ */
+.dag-quiz__card--folded {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin-bottom: 6px;
+  padding: 0 4px;
+  background: var(--dag-color-card);
+  border-color: var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-quiz__row-number {
+  min-width: 20px;
+  font-size: var(--chrome-text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--dag-color-slate);
+}
+.dag-quiz__row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--chrome-text-lg);
+  text-align: left;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quiz__row:hover { background: var(--dag-color-paper100); }
+.dag-quiz__row:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+.dag-quiz__row > svg { flex: none; color: var(--dag-color-slate); }
+.dag-quiz__row-words { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dag-quiz__row-words p { display: inline; margin: 0; }
+.dag-quiz__row-meta { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); white-space: nowrap; }
+.dag-quiz__row-meta--warn { color: var(--dag-color-warningText); font-weight: var(--dag-ui-weight-strong); }
+/* The mark of an unfinished question, on its line and in the count. */
+.dag-quiz__dot { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dag-color-warning); }
+/* How many questions, how many unfinished, and the way to them. */
+.dag-quiz__count { margin-block: 0 12px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
+.dag-quiz__count-unfinished { display: inline-flex; align-items: center; gap: 4px; color: var(--dag-color-warningText); font-weight: var(--dag-ui-weight-strong); }
+.dag-quiz__show {
+  padding: 0;
+  font: inherit;
+  color: var(--dag-color-accent);
+  background: none;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-quiz__show:hover { text-decoration: underline; }
+.dag-quiz__show:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* The open card's menu opens leftwards from the end of its head. */
+.dag-quiz__menu.dag-quiz__menu--end { right: 0; left: auto; width: auto; min-width: 180px; }
+.dag-quiz__menu .dag-more__item { width: 100%; color: var(--dag-color-ink); }
+.dag-quiz__menu .dag-more__item > svg { flex: none; color: var(--dag-color-slate); }
+.dag-quiz__menu .dag-more__item.dag-quiz__menu-danger,
+.dag-quiz__menu .dag-more__item.dag-quiz__menu-danger > svg { color: var(--dag-color-dangerText); }
+.dag-quiz__menu .dag-more__item:disabled { opacity: 0.5; cursor: default; }
 .dag-quiz__card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dag-quiz__card-number { font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
 /* The question's kind, and the menu that changes it. */
@@ -237,6 +306,8 @@
 .dag-quiz__kind:disabled { color: var(--dag-color-slate); cursor: default; }
 .dag-quiz__kind-icon,
 .dag-quiz__kind-chevron { flex: none; color: var(--dag-color-slate); }
+.dag-quiz__kind { min-width: 0; max-width: 100%; }
+.dag-quiz__kind-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A menu hanging from its button: *Add a question*'s kinds, a question's kind. */
 .dag-quiz__menu-box { position: relative; display: inline-flex; }
 .dag-quiz__menu {
@@ -638,6 +709,13 @@
   .dag-quiz,
   .dag-run,
   .dag-quiz-page { padding: 16px; }
+  /* A folded line at a finger's height; its summary goes, what it lacks stays. */
+  .dag-quiz__card--folded { min-height: 48px; }
+  .dag-quiz__row-meta:not(.dag-quiz__row-meta--warn) { display: none; }
+  /* The open card's head stays one line: the kind's name gives way before its tools wrap. */
+  .dag-quiz__card-head { flex-wrap: nowrap; }
+  .dag-quiz__card-head > * { flex: none; }
+  .dag-quiz__card-head > .dag-quiz__menu-box { flex: 0 1 auto; min-width: 0; }
 }
 
 /* A quiz, embedded — on a board or in a note: its title, how many questions and how many in
