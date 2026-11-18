@@ -140,6 +140,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The sidebar | [`sidebar.md`](sidebar.md) |
 | The time zone | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | The trash | [`trash.md`](trash.md) |
+| The visual review | [`gate-and-releases.md`](gate-and-releases.md) |
 | Things that will bite | [`things-that-will-bite.md`](things-that-will-bite.md) |
 | Tidy up | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Turning AI off | [`settings.md`](settings.md) |
