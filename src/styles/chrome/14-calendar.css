@@ -1,0 +1,627 @@
+/*
+ * The Calendar: tasks, events and notes on one timeline. A month is a
+ * grid of weeks whose rows are lanes of bars; a week or a run of days is an all-day row over an hour
+ * grid; the rows view is the week turned, one day to a row with its hours across. Every length an
+ * item's place depends on is a custom property the page paints — `--at` and `--len` in minutes,
+ * `--col`/`--of` for overlapping events down a column, `--lane` for one stacked in a row — and turned
+ * into pixels here against `--hour`, so the page never measures a pixel it did not draw. Every colour
+ * is the theme's: an event wears the accent's soft tint, a task the paper, a note nothing but its mark.
+ *
+ * Names claimed, grepped first: `dag-calendar*`, `dag-cal-*`, `dag-cal-mini*`, `dag-cal-rows*`,
+ * `dag-cal-row*`, `dag-app--calendar`, `dag-eventbar*`, `dag-eventline`, `dag-sidebar__event`,
+ * `data-dag-calendar*`, `data-dag-cal-*`, `data-dag-cal-mini*`, `data-dag-cal-rows`,
+ * `data-dag-cal-row`, `data-dag-cal-start`, `data-dag-eventbar*`,
+ * `data-dag-eventline`, `data-dag-sidebar-calendar`, `data-dag-sidebar-new-event`,
+ * `data-dag-sidebar-event`, `data-dag-note-make-event`, `dag-cal-menu*` and `data-dag-cal-menu*`, the
+ * storage keys `dag:calendar-hide`, `dag:week-start` and `dag:calendar-view`, and the query keys
+ * `calendar`, `view`, `date` and `days`.
+ */
+.dag-calendar {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+}
+.dag-calendar__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+/* The view and, beside it, the small month a week or a run of days keeps — one row filling what the
+   bar leaves. */
+.dag-calendar__body { flex: 1; min-height: 0; display: flex; gap: 16px; }
+/* Every control in one cluster at the right: where the view moves, then what it looks like. */
+.dag-calendar__cluster { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; margin-left: auto; }
+.dag-calendar__move,
+.dag-calendar__look { display: inline-flex; align-items: center; gap: 6px; }
+.dag-calendar__show { position: relative; display: inline-flex; }
+.dag-calendar__show-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.dag-calendar__show-toggle[aria-expanded="true"] { background: var(--dag-color-paper100); }
+.dag-calendar__show-toggle .dag-calendar__chev { color: var(--dag-color-muted); }
+/* Something is held back: a dot in the accent, so a calendar with notes switched off does not pass for an empty one. */
+.dag-calendar__held { width: 6px; height: 6px; border-radius: 50%; background: var(--dag-color-accent); }
+.dag-calendar__show-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-calendar__show-head { margin: 4px 6px 2px; font-size: var(--chrome-text-sm); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-calendar__show-menu .dag-calendar__kind { justify-content: flex-start; height: 30px; border: none; color: var(--dag-color-ink); background: transparent; }
+.dag-calendar__show-menu .dag-calendar__kind:hover { background: var(--dag-color-paper100); }
+.dag-calendar__show-menu .dag-calendar__kind[aria-pressed="false"] { color: var(--dag-color-slate); }
+/* A column: the bar's `flex-basis` would be its height here. */
+.dag-calendar__show-menu .dag-tasks__project { flex: none; margin: 0 4px 4px; }
+.dag-calendar__tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: 4px; /* a box under 20px: the control corner would make it a circle */
+}
+.dag-calendar__kind[aria-pressed="true"] .dag-calendar__tick { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+
+/* A month on a phone: numbers and dots, and the chosen day's list under the grid. */
+.dag-cal-dots { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.dag-cal-dots__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
+.dag-cal-dots__name { padding: 4px 0; text-align: center; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-cal-dots__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 48px;
+  padding: 4px 0 0;
+  font: inherit;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-cal-dots__day[data-out] { color: var(--dag-color-slate); }
+.dag-cal-dots__num { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; font-size: var(--chrome-text-lg); }
+.dag-cal-dots__day[data-today] .dag-cal-dots__num { color: var(--dag-color-accent); font-weight: var(--dag-ui-weight-strong); }
+.dag-cal-dots__day[aria-selected="true"] .dag-cal-dots__num { color: var(--dag-color-card); background: var(--dag-color-accent); font-weight: var(--dag-ui-weight-strong); }
+.dag-cal-dots__day:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-cal-dots__marks { display: flex; gap: 3px; height: 5px; }
+.dag-cal-dots__marks i { width: 5px; height: 5px; border-radius: 50%; background: var(--dag-color-muted); }
+.dag-cal-dots__marks i[data-kind="event"] { background: var(--dag-color-accent); }
+.dag-cal-dots__marks i[data-kind="task"] { background: var(--dag-color-hues-ochre); }
+.dag-cal-dots__list { display: flex; flex-direction: column; gap: 4px; padding: 12px 4px 16px; border-top: 1px solid var(--dag-color-outline); }
+.dag-cal-dots__list h2 { margin: 0 0 6px; font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-cal-dots__list .dag-calendar__item { min-height: 44px; padding: 0 10px; font-size: var(--chrome-text-lg); line-height: var(--dag-ui-leading-lg); border-radius: var(--dag-ui-radius-control); }
+.dag-cal-dots__none { margin: 0; font-size: var(--chrome-text-lg); color: var(--dag-color-slate); }
+.dag-calendar__today {
+  padding: 5px 12px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-calendar__today:hover { background: var(--dag-color-paper100); }
+.dag-calendar__today:focus-visible { box-shadow: var(--focus-ring); }
+.dag-calendar__step { display: inline-flex; gap: 2px; }
+.dag-calendar__title { flex: 1 1 auto; margin: 0; min-width: 12ch; font-size: var(--chrome-text-title); font-weight: var(--dag-ui-weight-strong); letter-spacing: -0.01em; }
+.dag-calendar__views { display: inline-flex; padding: 2px; border: 1px solid var(--dag-color-outline); border-radius: var(--dag-ui-radius-control); }
+.dag-calendar__count { display: inline-flex; align-items: center; gap: 6px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-calendar__count input {
+  width: 52px;
+  min-height: 24px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-calendar__kinds { display: inline-flex; gap: 4px; }
+.dag-calendar__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px dashed var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-calendar__kind[aria-pressed="true"] { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-style: solid; }
+.dag-calendar__kind:focus-visible { box-shadow: var(--focus-ring); }
+
+/* One thing on the calendar: a link to its note. */
+.dag-calendar__item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  /* A bar is a link, and 20px was its one line of text (#209). The week's timed blocks below stay
+     the event's own height, which is what the grid means by it. */
+  min-height: 24px;
+  padding: 1px 6px;
+  box-sizing: border-box;
+  font-size: var(--chrome-text-sm);
+  line-height: 18px;
+  color: var(--dag-color-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--dag-color-paper100);
+  border-radius: var(--dag-ui-radius-control);
+  overflow: hidden;
+  cursor: pointer;
+}
+.dag-calendar__item[data-kind="event"] { background: var(--dag-color-accentSoft); }
+.dag-calendar__item[data-kind="note"] { color: var(--dag-color-slate); background: transparent; }
+.dag-calendar__item:hover { box-shadow: inset 0 0 0 1px var(--dag-color-outline); }
+.dag-calendar__item:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-calendar__item[data-done] .dag-calendar__name { color: var(--dag-color-slate); text-decoration: line-through; }
+.dag-calendar__item[data-before] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.dag-calendar__item[data-after] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.dag-calendar__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dag-calendar__time { flex: none; color: var(--dag-color-slate); font-variant-numeric: tabular-nums; }
+.dag-calendar__mark { flex: none; color: var(--dag-color-slate); }
+.dag-calendar__item[data-kind="event"] .dag-calendar__mark { color: var(--dag-color-accent); }
+
+/* An item's menu: the sidebar's menu control, placed at the pointer (or under the item, from the
+   keyboard) and kept inside the window by `menuWithin`. Names grepped first: `dag-cal-menu*` and
+   `data-dag-cal-menu*` were nobody's. */
+.dag-cal-menu {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 184px;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+  z-index: var(--dag-ui-layer-popover);
+}
+.dag-cal-menu .dag-more__item { width: 100%; color: var(--dag-color-ink); }
+.dag-cal-menu .dag-more__item > svg { flex: none; color: var(--dag-color-slate); }
+.dag-cal-menu .dag-more__item:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-cal-menu__danger:hover { color: var(--dag-color-dangerText); }
+.dag-cal-menu__locked { margin: 4px 8px 2px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+
+/* A small month beside a week or a run of days, as most calendar apps keep: its own arrows move it
+   and nothing else, a day takes the view there, today keeps the accent ring, and the days the view
+   shows wear its tint. `data-in-view` is paint, so a day's number still reads on it (`ink` on
+   `accentSoft`); under 720px it is not drawn, because a week's seven columns already have the
+   phone's whole width. */
+.dag-cal-mini {
+  flex: none;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 240px;
+  padding: 12px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  user-select: none;
+}
+.dag-cal-mini__head { display: flex; align-items: center; gap: 4px; }
+.dag-cal-mini__title { flex: 1; min-width: 0; margin: 0; font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-cal-mini__step { display: inline-flex; gap: 2px; }
+.dag-cal-mini__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.dag-cal-mini__name { padding: 2px 0; text-align: center; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-slate); }
+.dag-cal-mini__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The 24px floor every control meets (#209). */
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-cal-mini__day[data-out] { color: var(--dag-color-slate); }
+.dag-cal-mini__day[data-in-view] { background: var(--dag-color-accentSoft); }
+.dag-cal-mini__day:hover { background: var(--dag-color-paper200); }
+.dag-cal-mini__day[data-today] { font-weight: var(--dag-ui-weight-strong); box-shadow: inset 0 0 0 1.5px var(--dag-color-accent); }
+.dag-cal-mini__day:focus-visible { box-shadow: var(--focus-ring-inset); }
+
+/* The month. */
+.dag-cal-month {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* Never shorter than a week's own rows: a day is drawn across all of them, and a track shorter
+     than its lanes let the shading of one week run down over the next. */
+  grid-template-rows: auto repeat(var(--weeks), minmax(max-content, 1fr));
+  overflow: auto;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  user-select: none;
+}
+.dag-cal-names { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-names__day { padding: 6px 8px; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); letter-spacing: 0.04em; text-transform: uppercase; color: var(--dag-color-slate); }
+.dag-cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: 30px repeat(var(--lanes), 24px) 24px 1fr;
+  row-gap: 2px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-cal-week:last-child { border-bottom: none; }
+.dag-cal-day { grid-row: 1 / -1; min-width: 0; border-right: 1px solid var(--dag-color-outlineSoft); cursor: cell; }
+.dag-cal-day:nth-child(7) { border-right: none; }
+.dag-cal-day[data-other] { background: var(--dag-color-paper100); }
+.dag-cal-day[data-dag-cal-picked] { background: var(--dag-color-accentSoft); }
+.dag-cal-day__n {
+  min-width: 24px;
+  height: 24px;
+  /* 24 + two 3px margins is the week's 30px header row. */
+  margin: 3px 6px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-cal-day__n:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-cal-day__n:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-cal-day[data-today] .dag-cal-day__n { font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-accent); box-shadow: inset 0 0 0 1.5px var(--dag-color-accent); }
+.dag-cal-week > .dag-calendar__item { margin: 0 4px; }
+.dag-cal-more {
+  justify-self: start;
+  min-height: 24px;
+  margin: 0 6px;
+  padding: 0 4px;
+  font: inherit;
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-cal-more:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+
+/* A week, or a run of days. */
+.dag-cal-cols {
+  --gutter: 56px;
+  --hour: 48px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  user-select: none;
+}
+.dag-cal-cols__head,
+.dag-cal-allday,
+.dag-cal-grid { display: grid; grid-template-columns: var(--gutter) repeat(var(--days), minmax(0, 1fr)); }
+.dag-cal-cols__head { border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-cols__day { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 8px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-cal-cols__n { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-cal-cols__day[data-today] .dag-cal-cols__n,
+.dag-cal-cols__day[data-today] .dag-cal-cols__weekday { color: var(--dag-color-accent); }
+.dag-cal-allday {
+  grid-template-rows: repeat(var(--lanes), 24px);
+  row-gap: 2px;
+  min-height: 28px;
+  max-height: 30%;
+  padding: 4px 0;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--dag-color-outline);
+}
+.dag-cal-allday__label { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; grid-row: 1 / -1; grid-column: 1; padding: 2px 8px; font-size: var(--chrome-text-xs); text-align: right; color: var(--dag-color-slate); }
+.dag-cal-allday__less { margin: 0; }
+.dag-cal-allday > .dag-cal-more { position: relative; z-index: 1; align-self: center; }
+.dag-cal-allday__cell { grid-row: 1 / -1; border-left: 1px solid var(--dag-color-outlineSoft); cursor: cell; }
+.dag-cal-allday__cell[data-dag-cal-picked] { background: var(--dag-color-accentSoft); }
+.dag-cal-allday > .dag-calendar__item { margin: 0 3px; }
+.dag-cal-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.dag-cal-grid { height: calc(var(--hour) * 24); }
+.dag-cal-hours { position: relative; }
+.dag-cal-hours__h {
+  position: absolute;
+  right: 8px;
+  top: calc(var(--at) * var(--hour) / 60);
+  transform: translateY(-50%);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+  font-variant-numeric: tabular-nums;
+}
+.dag-cal-column {
+  position: relative;
+  border-left: 1px solid var(--dag-color-outlineSoft);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--hour) - 1px),
+    var(--dag-color-outlineSoft) calc(var(--hour) - 1px),
+    var(--dag-color-outlineSoft) var(--hour)
+  );
+  cursor: cell;
+}
+.dag-cal-column > .dag-calendar__item {
+  position: absolute;
+  top: calc(var(--at) * var(--hour) / 60 + 1px);
+  left: calc(var(--col) * 100% / var(--of) + 2px);
+  width: calc(100% / var(--of) - 4px);
+  height: calc(var(--len) * var(--hour) / 60 - 2px);
+  min-height: 14px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  column-gap: 4px;
+  row-gap: 0;
+  padding: 2px 6px;
+  line-height: 16px;
+  white-space: normal;
+  border-left: 3px solid var(--dag-color-accent);
+}
+.dag-cal-column > .dag-calendar__item[data-short] { flex-wrap: nowrap; align-items: center; padding-top: 0; padding-bottom: 0; white-space: nowrap; }
+.dag-cal-ghost {
+  position: absolute;
+  top: calc(var(--at) * var(--hour) / 60);
+  left: 2px;
+  right: 2px;
+  height: calc(var(--len) * var(--hour) / 60);
+  background: var(--dag-color-accentSoft);
+  border: 1px solid var(--dag-color-accent);
+  border-radius: var(--dag-ui-radius-control);
+  pointer-events: none;
+}
+/* An event or a task being moved: what it was is dimmed, where it goes is the ghost — the
+   time it would start written in it — or, along the days, the cells drawing a range already wears. */
+.dag-calendar__item[data-movable] { cursor: grab; }
+:root[data-dag-dragging] .dag-calendar__item[data-movable] { cursor: grabbing; }
+.dag-calendar__item[data-dag-cal-moving] { opacity: 0.45; }
+/* An end to pull: the last few pixels of a bar's sides, or of a block's top and bottom. Nothing is
+   drawn — the cursor says it — so a bar reads as it always did. */
+.dag-calendar__edge { position: absolute; z-index: 1; }
+.dag-calendar__edge[data-axis="x"] { top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
+.dag-calendar__edge[data-axis="x"][data-dag-cal-edge="start"] { left: 0; }
+.dag-calendar__edge[data-axis="x"][data-dag-cal-edge="end"] { right: 0; }
+.dag-calendar__edge[data-axis="y"] { left: 0; right: 0; height: 5px; cursor: ns-resize; }
+.dag-calendar__edge[data-axis="y"][data-dag-cal-edge="start"] { top: 0; }
+.dag-calendar__edge[data-axis="y"][data-dag-cal-edge="end"] { bottom: 0; }
+html[data-dag-cal-pulling="x"],
+html[data-dag-cal-pulling="x"] * { cursor: ew-resize !important; }
+html[data-dag-cal-pulling="y"],
+html[data-dag-cal-pulling="y"] * { cursor: ns-resize !important; }
+.dag-cal-ghost--move { z-index: 3; padding: 2px 6px; box-sizing: border-box; font-size: var(--chrome-text-sm); line-height: var(--dag-ui-leading-sm); border-left-width: 3px; }
+.dag-cal-now {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--at) * var(--hour) / 60);
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--dag-color-danger);
+  pointer-events: none;
+}
+.dag-cal-now::before { content: ""; position: absolute; top: -3px; left: -4px; width: 8px; height: 8px; background: var(--dag-color-danger); border-radius: 50%; }
+
+/* A week as rows: one day to a row, the day and its all-day things at the start of it, and the
+   hours of the day across the track. It reads the same `--at`/`--len` minutes as a day's column —
+   a left edge and a width here instead of a top and a height — and `--lane` is the stack row an
+   overlapping event takes, so a bar is 24px tall, the floor every control meets (#209). The row
+   grows for any all-day things at its start, and the whole grid scrolls when the week is taller
+   than the page. Names grepped first: `dag-cal-rows*`, `dag-cal-row*`, `data-dag-cal-rows`,
+   `data-dag-cal-row` and `data-dag-cal-start` were nobody's. */
+.dag-cal-rows {
+  --day: 96px;
+  --start: 168px;
+  --lane-h: 26px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  user-select: none;
+}
+.dag-cal-rows__head,
+.dag-cal-row { display: grid; grid-template-columns: var(--day) var(--start) minmax(0, 1fr); }
+.dag-cal-rows__head { position: sticky; top: 0; z-index: 1; background: var(--dag-color-paper); border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__corner { position: sticky; left: 0; z-index: 1; background: var(--dag-color-paper); border-right: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__allday { display: flex; align-items: center; justify-content: flex-end; padding: 0 8px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); border-right: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-rows__hours { position: relative; height: 28px; }
+.dag-cal-rows__hour {
+  position: absolute;
+  top: 7px;
+  left: calc(var(--at) * 100% / 1440 + 4px);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dag-cal-row { border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-cal-row:last-child { border-bottom: none; }
+.dag-cal-row__day {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper);
+  border-right: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-cal-row__n { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-cal-row[data-today] .dag-cal-row__weekday,
+.dag-cal-row[data-today] .dag-cal-row__n { color: var(--dag-color-accent); }
+/* Where a row starts: its all-day things, one under another, and a day a drag across them can make
+   all day — the same `data-dag-cal-day` the week's all-day row and a month's cells wear. */
+.dag-cal-row__start {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px;
+  border-right: 1px solid var(--dag-color-outlineSoft);
+  cursor: cell;
+}
+.dag-cal-row__start[data-dag-cal-picked] { background: var(--dag-color-accentSoft); }
+.dag-cal-row__start > .dag-calendar__item { margin: 0; }
+/* The hours across the row: a line an hour, then the day's timed events on the clock. A bar's width
+   is the time it lasts; an end shorter than a press is drawn at the 24px floor so it can still be
+   taken hold of. Overlaps stack in `--lane`, which is what `blocks`' `col` says. */
+.dag-cal-row__track {
+  position: relative;
+  min-width: 0;
+  /* As tall as the stack of timed events in it, and never shorter than one 24px bar and its air. */
+  min-height: calc(var(--lanes, 1) * var(--lane-h) + 8px);
+  background-image: linear-gradient(to right, var(--dag-color-outlineSoft) 1px, transparent 1px);
+  background-size: calc(100% / 24) 100%;
+  cursor: cell;
+}
+.dag-cal-row__track > .dag-calendar__item {
+  position: absolute;
+  top: calc(4px + var(--lane) * var(--lane-h));
+  left: calc(var(--at) * 100% / 1440 + 1px);
+  width: calc(var(--len) * 100% / 1440 - 2px);
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  line-height: 22px;
+  border-left: 3px solid var(--dag-color-accent);
+}
+.dag-cal-row__track > .dag-calendar__item[data-kind="note"] { border-left-color: transparent; }
+.dag-cal-row__track > .dag-cal-ghost {
+  top: 4px;
+  left: calc(var(--at) * 100% / 1440);
+  right: auto;
+  width: calc(var(--len) * 100% / 1440);
+  min-width: 24px;
+  height: 24px;
+}
+.dag-cal-row__track > .dag-cal-ghost--move { z-index: 3; display: flex; align-items: center; gap: 4px; padding: 0 6px; line-height: 22px; overflow: hidden; white-space: nowrap; }
+.dag-cal-row__track > .dag-cal-now { top: 0; bottom: 0; right: auto; left: calc(var(--at) * 100% / 1440); width: 2px; height: auto; }
+.dag-cal-row__track > .dag-cal-now::before { top: -4px; left: -3px; }
+
+/* Narrower windows give the hours more room, then thin the scale to every fourth hour. Under 720px
+   the grid keeps a width a finger can read and scrolls sideways; the day stays at the start. */
+@media (max-width: 1100px) {
+  .dag-cal-rows { --day: 78px; --start: 132px; }
+  .dag-cal-rows__hour:nth-child(4n + 3) { display: none; }
+}
+@media (max-width: 719px) {
+  .dag-cal-rows { --day: 64px; --start: 112px; }
+  .dag-cal-rows__head,
+  .dag-cal-row { min-width: 720px; }
+  .dag-cal-rows__hour:not(:nth-child(4n + 1)) { display: none; }
+}
+
+/* The card that sets up what was drawn: its title, when it is, and what it is about. */
+.dag-calendar__new {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(340px, calc(100vw - 24px));
+  padding: 12px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-calendar__new-when { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-calendar__new-when > svg { flex: none; }
+.dag-calendar__new-zone { margin-left: auto; }
+.dag-calendar__new-field {
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  color-scheme: inherit;
+  background: var(--dag-color-paper);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-calendar__new-title { font-size: var(--chrome-text-lg); }
+.dag-calendar__new-field:focus-visible { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-calendar__new-field:disabled { opacity: 0.6; }
+.dag-calendar__new-allday { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dag-calendar__new-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); cursor: pointer; }
+.dag-calendar__new-times { display: grid; grid-template-columns: 44px minmax(0, 1fr) 104px; align-items: center; gap: 6px; }
+.dag-calendar__new-times > label { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-calendar__new-times .dag-calendar__new-field { padding-inline: 6px; }
+.dag-calendar__new-description { min-height: 44px; resize: vertical; }
+.dag-calendar__new-acts { display: flex; justify-content: flex-end; gap: 8px; }
+.dag-calendar__new-cancel,
+.dag-calendar__new-make {
+  padding: 5px 12px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-calendar__new-cancel { color: var(--dag-color-slate); background: transparent; border: 1px solid transparent; }
+.dag-calendar__new-cancel:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-calendar__new-make { color: var(--dag-color-accent); background: var(--dag-color-accentSoft); border: 1px solid var(--dag-color-accent); }
+.dag-calendar__new-make:disabled { opacity: 0.6; cursor: default; }
+
+@media (max-width: 719px) {
+  .dag-calendar { padding: 12px; }
+  /* The cluster on two rows: the title and where it moves, then how it looks. */
+  .dag-calendar__bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 4px; }
+  .dag-calendar__cluster { display: contents; }
+  .dag-calendar__title { min-width: 0; font-size: var(--chrome-text-title); }
+  .dag-calendar__look { grid-column: 1 / -1; }
+  .dag-calendar__views { flex: 1; }
+  .dag-calendar__views > * { flex: 1; justify-content: center; }
+  .dag-calendar__today { min-height: 40px; }
+  .dag-calendar__step .dag-icon { width: 44px; height: 44px; }
+  /* A week's seven columns already have the phone's whole width; there is none for a month beside them. */
+  .dag-cal-mini { display: none; }
+}
+
+/* An event's own page: its bar under the title, and its line where nothing may change it. */
+.dag-eventbar__what { display: inline-flex; align-items: center; gap: 6px; font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-eventbar__what svg { color: var(--dag-color-accent); }
+.dag-eventbar__allday { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.dag-eventbar__zone { font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-projectbar + .dag-eventbar { margin-top: -12px; }
+.dag-sidebar__event { flex: none; }
+

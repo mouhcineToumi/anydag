@@ -12,45 +12,20 @@ import { streamSSE } from "hono/streaming";
 
 import type { Assistant } from "../chat/live";
 import { modelsFor } from "../chat/models";
-import { DOC_KINDS, PROVIDERS, type ChatEvent, type DocKind, type Mode, type Provider } from "../chat/types";
-import { bodyOf, err } from "../http";
-
-const str = (v: unknown, what: string): string => {
-  if (typeof v !== "string" || !v.trim()) throw err(400, `\`${what}\` is required`);
-  return v.trim();
-};
-const provider = (v: unknown): Provider | undefined => {
-  if (v === undefined || v === null || v === "") return undefined;
-  if (!PROVIDERS.includes(v as Provider)) throw err(400, `\`${String(v)}\` is not a provider`);
-  return v as Provider;
-};
-const mode = (v: unknown): Mode | undefined => {
-  if (v === undefined || v === null || v === "") return undefined;
-  if (v !== "ask" && v !== "edit") throw err(400, "`mode` is `ask` or `edit`");
-  return v;
-};
-
-/** A turn's `subject`: absent keeps the chat's, `null` drops it, `{name, kind}` names a document of this vault. */
-const subject = (v: unknown): { name: string; kind: DocKind } | null | undefined => {
-  if (v === undefined) return undefined;
-  if (v === null) return null;
-  const o = v as { name?: unknown; kind?: unknown };
-  if (!o || typeof o !== "object" || typeof o.name !== "string" || !o.name || !DOC_KINDS.includes(o.kind as DocKind))
-    throw err(400, "`subject` is `{name, kind}` or null");
-  return { name: o.name, kind: o.kind as DocKind };
-};
-
-/** A turn's `mentions`: absent or `[]` is none, and each is a document of this vault. */
-const mentions = (v: unknown): { name: string; kind: DocKind }[] | undefined => {
-  if (v === undefined) return undefined;
-  if (!Array.isArray(v) || v.length > 20) throw err(400, "`mentions` is a list of at most 20 `{name, kind}`");
-  return v.map((x) => {
-    const o = x as { name?: unknown; kind?: unknown };
-    if (!o || typeof o !== "object" || typeof o.name !== "string" || !o.name || !DOC_KINDS.includes(o.kind as DocKind))
-      throw err(400, "each mention is `{name, kind}`");
-    return { name: o.name, kind: o.kind as DocKind };
-  });
-};
+import type { ChatEvent } from "../chat/types";
+import { bodyAs, err } from "../http";
+import {
+  AccessBody,
+  ApproveBody,
+  BlockBody,
+  ChatIdBody,
+  GrantBody,
+  NewChatBody,
+  RenameChatBody,
+  required,
+  TurnBody,
+  UndoBody,
+} from "../schema/chat";
 
 /** Requests from a chat's MCP server: the reach, the approvals, the recorder. Registered
  *  before the vault scoping, so a chat's request is scoped to the chat's vault, not the default. */
@@ -64,68 +39,62 @@ export function chatRoutes(app: Hono, a: Assistant): void {
   app.get("/__board/chat/models", async (c) => c.json(await modelsFor(a.providers(), process.env, a.fake())));
 
   app.post("/__board/chat", async (c) => {
-    const b = await bodyOf(c);
-    const p = provider(b.provider);
-    if (!p) throw err(400, "`provider` is required");
+    const b = await bodyAs(c, NewChatBody);
     const chat = a.create(c.req.query("vault"), {
-      provider: p,
-      model: str(b.model, "model"),
+      provider: b.provider,
+      model: b.model,
       effort: typeof b.effort === "string" ? b.effort : undefined,
       title: typeof b.title === "string" ? b.title : undefined,
     });
     return c.json({ chat });
   });
 
-  app.get("/__board/chat", (c) => c.json(a.read(str(c.req.query("id"), "id"), c.req.query("vault"))));
+  app.get("/__board/chat", (c) => c.json(a.read(required(c.req.query("id"), "id"), c.req.query("vault"))));
 
   app.post("/__board/chat/rename", async (c) => {
-    const b = await bodyOf(c);
-    return c.json({ chat: a.rename(str(b.id, "id"), str(b.title, "title"), c.req.query("vault")) });
+    const b = await bodyAs(c, RenameChatBody);
+    return c.json({ chat: a.rename(b.id, b.title, c.req.query("vault")) });
   });
 
   app.post("/__board/chat/delete", async (c) => {
-    const b = await bodyOf(c);
-    await a.remove(str(b.id, "id"), c.req.query("vault"));
+    const b = await bodyAs(c, ChatIdBody);
+    await a.remove(b.id, c.req.query("vault"));
     return c.json({ ok: true });
   });
 
   app.post("/__board/chat/turn", async (c) => {
-    const b = await bodyOf(c);
-    const turn = await a.say(str(b.id, "id"), str(b.text, "text"), {
+    const b = await bodyAs(c, TurnBody);
+    const turn = await a.say(b.id, b.text, {
       vault: c.req.query("vault"),
-      provider: provider(b.provider),
+      provider: b.provider,
       model: typeof b.model === "string" && b.model ? b.model : undefined,
       effort: b.effort === null ? null : typeof b.effort === "string" ? b.effort : undefined,
-      subject: subject(b.subject),
-      mentions: mentions(b.mentions),
+      subject: b.subject,
+      mentions: b.mentions,
     });
     return c.json({ turn });
   });
 
   app.post("/__board/chat/stop", async (c) => {
-    const b = await bodyOf(c);
-    await a.stop(str(b.id, "id"));
+    const b = await bodyAs(c, ChatIdBody);
+    await a.stop(b.id);
     return c.json({ ok: true });
   });
 
   app.post("/__board/chat/approve", async (c) => {
-    const b = await bodyOf(c);
-    if (typeof b.yes !== "boolean") throw err(400, "`yes` is true or false");
-    a.answer(str(b.id, "id"), str(b.step, "step"), b.yes);
+    const b = await bodyAs(c, ApproveBody);
+    a.answer(b.id, b.step, b.yes);
     return c.json({ ok: true });
   });
 
   app.post("/__board/chat/grant", async (c) => {
-    const b = await bodyOf(c);
-    const m = b.mode === null || b.on === false ? null : (mode(b.mode) ?? "ask");
-    return c.json({ chat: a.grant(str(b.id, "id"), str(b.vault, "vault"), m, c.req.query("vault")) });
+    const b = await bodyAs(c, GrantBody);
+    return c.json({ chat: a.grant(b.id, b.vault, b.mode, c.req.query("vault")) });
   });
 
   const undo = (redo: boolean) => async (c: Context) => {
-    const b = await bodyOf(c);
-    return c.json({
-      record: await a.undo(str(b.id, "id"), str(b.turn, "turn"), str(b.block, "block"), redo, c.req.query("vault")),
-    });
+    const b = await bodyAs(c, UndoBody);
+    return c.json({ record: await a.undo(b.id, b.turn, b.block, redo, c.req.query("vault")) });
   };
   // Written out, not looped: `scripts/parity.mjs` reads the routes off the literal calls.
   app.post("/__board/chat/undo", undo(false));
@@ -134,14 +103,14 @@ export function chatRoutes(app: Hono, a: Assistant): void {
   // The chat's MCP server's own two.
   app.post("/__board/chat/block", async (c) => {
     if (!c.req.header("x-anydag-chat")) throw err(403, "only a chat's own tools call this", { code: "chat-only" });
-    const b = await bodyOf(c);
+    const b = await bodyAs(c, BlockBody);
     return c.json({ block: a.block(c, typeof b.title === "string" ? b.title : "") });
   });
 
   app.post("/__board/chat/access", async (c) => {
     if (!c.req.header("x-anydag-chat")) throw err(403, "only a chat's own tools call this", { code: "chat-only" });
-    const b = await bodyOf(c);
-    return c.json(await a.access(c, str(b.vault, "vault"), typeof b.why === "string" ? b.why : "", mode(b.mode) ?? "ask"));
+    const b = await bodyAs(c, AccessBody);
+    return c.json(await a.access(c, b.vault, typeof b.why === "string" ? b.why : "", b.mode ?? "ask"));
   });
 
   /** One chat's events with `?id=`, every chat's without — the list redraws on `chat` and `end`. */

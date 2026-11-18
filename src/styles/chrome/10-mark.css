@@ -1,0 +1,66 @@
+/* ---------------------------------------------------------------------------
+   The mark.
+
+   `src/ui/Logo.tsx` draws it; these two rules place it. The SVG is `currentColor` for the frame
+   and the stroke, so wherever it is dropped it takes that context's ink — the toolbar's, the auth
+   card's — and only the accent node comes from the theme by name. Nothing here is a `--dag-*`
+   candidate: no theme has an opinion about how far a logo sits from a panel toggle, which is the
+   same argument that exempts this whole file from `check-literals.mjs`'s length rule.
+
+   Names grepped first: `dag-logo` and `data-dag-logo` appear nowhere in `nodes.css`, and
+   `dag-mark` — which does exist, for an edge's arrowhead — was rejected on the way past for
+   exactly that reason.
+   --------------------------------------------------------------------------- */
+.dag-logo { display: block; flex: none; }
+
+.dag-toolbar__logo {
+  display: flex;
+  align-items: center;
+  flex: none;
+  margin-right: 2px;
+  padding: 4px;
+  font: inherit;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+/* The logo goes home from here too — the column is away, which is when this bar carries it. The
+   hover is the bar's own (`dag-toolbar__board`'s), not the column's. */
+.dag-toolbar__logo:hover { background: var(--dag-color-paper100); }
+.dag-toolbar__logo:focus-visible { box-shadow: var(--focus-ring); }
+
+/*
+ * The mark and the name as one thing.
+ *
+ * Both numbers are the brand's lockup, written as fractions
+ * of the mark rather than as pixels, so the toolbar's 20px and the sign-in card's 32px are the
+ * same lockup at two sizes instead of two sets of figures to keep in step. In its source drawing
+ * the box is 64 units, the name is set at `font-size: 44`, and it starts at `x=86` — 22 units past
+ * the box. Those are the two ratios here and there is nothing else to carry over: the asset draws the
+ * name as outlines, which an app must not, or it could not be read out, could not be selected and
+ * would not take the theme's ink.
+ *
+ * `--lockup-mark` deliberately does not carry the theme prefix. `check-theme.mjs` reads that
+ * prefix literally and would demand a key in all three themes for how big somebody drew a logo,
+ * which is the argument `--inspector-w` and `--canvas-x` already make. It reads *this comment*
+ * literally too: writing the prefixed spelling out, even to say it is wrong, failed the gate.
+ */
+.dag-lockup {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: calc(var(--lockup-mark) * 22 / 64);
+  color: var(--dag-color-ink);
+}
+.dag-lockup__name {
+  /* calc on the mark's size: the lockup is a logo drawing, it scales with the mark. */
+  font-size: calc(var(--lockup-mark) * 44 / 64);
+  font-weight: var(--dag-ui-weight-strong);
+  /* The asset's `letter-spacing: -1.3` against its `font-size: 44`. */
+  letter-spacing: -0.0295em;
+  line-height: 1;
+  white-space: nowrap;
+}
+

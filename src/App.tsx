@@ -1201,6 +1201,15 @@ function useFeedbackOpen(): { open: boolean; show(): void; close(): void } {
  * owns every key on a board and is not mounted on these pages, so this is the whole of what they
  * hear. It was the note page's own until the Tasks page needed the same two.
  */
+/**
+ * A key typed into a field, or one something else took, is not the page's: a quiz field opening
+ * keeps the letters typed before its editor is there (`RichField`), and a space among them is a
+ * space, not `space A`.
+ */
+function notThePages(e: KeyboardEvent): boolean {
+  return typing(e.target) || e.defaultPrevented;
+}
+
 function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }) {
   const ref = useRef(on);
   ref.current = on;
@@ -1216,7 +1225,7 @@ function usePageKeys(snapshot: boolean, on: { settings(): void; search(): void }
         ref.current.settings();
         return;
       }
-      if (typing(e.target)) {
+      if (notThePages(e)) {
         leader = false;
         return;
       }
@@ -2011,11 +2020,8 @@ function QuizApp({
           className="dag-quiz__status"
           data-dag-quiz-saving={file.state.status === "ready" && file.state.saving ? "" : undefined}
         >
-          {file.state.status === "ready" && file.state.failed
-            ? "Not saved yet. Trying again."
-            : askableCount < quiz.questions.length
-              ? `${quiz.questions.length - askableCount} of ${quiz.questions.length} cannot be practiced until fixed`
-              : ""}
+          {/* What is unfinished is the form's to say, under the description, with a way to it (#257). */}
+          {file.state.status === "ready" && file.state.failed ? "Not saved yet. Trying again." : ""}
         </span>
       </QuizEditor>
     );

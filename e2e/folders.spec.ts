@@ -150,7 +150,18 @@ test("a board moved to the folder it is already in is left alone", async ({ page
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
   await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
-  await expect(page.locator("[data-dag-sidebar-over]")).toHaveCount(0);
+  /* Every worker's vault is a folder at the top level, so the rows can move under a held pointer
+     while another worker makes or removes one (#493). The check is made with the pointer on the
+     folder's row as it is drawn now — read again, and confirmed under the pointer — and never on
+     whatever row slid under it, which may well be a drop target. */
+  await expect(async () => {
+    const now = (await page.locator(folderRow(`${parent}/b`)).boundingBox())!;
+    const at = { x: now.x + now.width / 2, y: now.y + now.height / 2 };
+    await page.mouse.move(at.x, at.y);
+    const sel = folderRow(`${parent}/b`);
+    expect(await page.evaluate(({ x, y, sel }) => !!document.elementFromPoint(x, y)?.closest(sel), { ...at, sel })).toBe(true);
+    await expect(page.locator("[data-dag-sidebar-over]")).toHaveCount(0, { timeout: 500 });
+  }).toPass({ timeout: 5_000 });
   await page.mouse.up();
 
   await page.waitForTimeout(800);

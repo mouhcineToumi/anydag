@@ -22,7 +22,10 @@ and repository path named here in backticks has to exist, or the check fails.
 - **There are three themes**: Paper (`paper`, labelled *Light* in Settings), Paper Dark
   (`paper-dark`, *Dark*) and Neutral (`neutral`). They differ in `color` and `fonts`. The `ui` block
   is identical in all three.
-- **The chrome's CSS is `src/styles/chrome.css`**, the one file exempt from the no-literal rule. It
+- **The chrome's CSS is `src/styles/chrome.css`**, the one stylesheet exempt from the no-literal
+  rule. It is an index: one file per area of the app under `src/styles/chrome/` (`03-sidebar.css`,
+  `11-notes.css`, …), imported in the order that is the cascade (#492). A rule goes in its area's
+  file; a new area is a new numbered file, imported in its place. It
   may type a length. It may not type a colour: every colour is `var(--dag-color-…)`. **Every font
   size reads a `--chrome-text-*` step**, the theme's `ui.text.*` multiplied by `--text-scale` — the
   person's **Text size** in Settings → Appearance (#325) — and a note's Markdown reads

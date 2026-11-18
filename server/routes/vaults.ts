@@ -12,7 +12,8 @@ import os from "node:os";
 import type { Hono } from "hono";
 
 import type { Session } from "../context";
-import { anyKind, bodyOf, err, mustExist } from "../http";
+import { anyKind, bodyAs, err, mustExist } from "../http";
+import { CloseVaultBody, CreateVaultBody, OpenVaultBody, TransferBody } from "../schema/vaults";
 import { folderFrom, PLURAL, type Kind } from "../names";
 import { byKind, NotFound, Refused, type Vault } from "../vault";
 
@@ -43,8 +44,7 @@ export function vaultRoutes(app: Hono, s: Session): void {
   app.get("/api/vaults", (c) => c.json({ vaults: s.recent(), home: os.homedir() }));
 
   app.post("/api/vaults/open", async (c) => {
-    const body = await bodyOf(c);
-    if (typeof body.path !== "string" || !body.path.trim()) throw err(400, "expected `path`: the folder to open");
+    const body = await bodyAs(c, OpenVaultBody);
     try {
       return c.json({ vault: describe(s.openFolder(expand(body.path.trim()))) });
     } catch (e) {
@@ -54,8 +54,7 @@ export function vaultRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/api/vaults/create", async (c) => {
-    const body = await bodyOf(c);
-    if (typeof body.parent !== "string" || typeof body.name !== "string") throw err(400, "expected `parent` and `name`");
+    const body = await bodyAs(c, CreateVaultBody);
     try {
       return c.json({ vault: describe(s.createVault(expand(body.parent.trim()), body.name)) });
     } catch (e) {
@@ -65,8 +64,7 @@ export function vaultRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/api/vaults/close", async (c) => {
-    const body = await bodyOf(c);
-    if (typeof body.id !== "string") throw err(400, "expected `id`");
+    const body = await bodyAs(c, CloseVaultBody);
     // Closing says `gone` on its feed, so every tab on it goes to the picker rather than writing
     // into nothing.
     await (body.forget === true ? s.forget(body.id) : s.close(body.id));
@@ -79,8 +77,7 @@ export function vaultRoutes(app: Hono, s: Session): void {
    * numbered; a folder taken there is a 409. Copy, then delete — a failure leaves two copies, never none.
    */
   app.post("/__board/transfer", async (c) => {
-    const body = await bodyOf(c);
-    if (typeof body.to !== "string" || !body.to) throw err(400, "expected `to`: the vault to move it to");
+    const body = await bodyAs(c, TransferBody);
     const from = s.vault;
     const to = s.other(body.to);
     if (to.id === from.id) throw err(400, "it is already in that vault");

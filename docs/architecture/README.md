@@ -73,6 +73,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Diagnostics | [`diagnostics.md`](diagnostics.md) |
 | Dragging a card | [`editing-drag.md`](editing-drag.md) |
 | Editing on the canvas | [`editing.md`](editing.md) |
+| Editing, timed | [`limits.md`](limits.md) |
 | Equations | [`notes.md`](notes.md) |
 | Feedback | [`feedback.md`](feedback.md) |
 | Flashcards from a model | [`prompt-cards.md`](prompt-cards.md) |
@@ -112,6 +113,8 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | Smart guides | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Sync | [`sync.md`](sync.md) |
 | The api server | [`api.md`](api.md) |
+| The OpenAPI document | [`api.md`](api.md) |
+| The local OpenAPI document | [`server.md`](server.md) |
 | The bench | [`limits.md`](limits.md) |
 | Tables | [`tables.md`](tables.md) |
 | Tags | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
@@ -123,6 +126,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The desktop app | [`desktop.md`](desktop.md) |
 | The dock's tooltip | [`getting-around.md`](getting-around.md) |
 | The document tabs | [`sidebar.md`](sidebar.md) |
+| The merge queue | [`gate-and-releases.md`](gate-and-releases.md) |
 | The tabs' keys, their order and their menu | [`sidebar.md`](sidebar.md) |
 | The free canvas | [`free-canvas.md`](free-canvas.md) |
 | The graph route | [`graph.md`](graph.md) |
@@ -139,6 +143,7 @@ The text cross-refers by section name (*Picking a node*, *Wikilinks follow a ren
 | The sidebar | [`sidebar.md`](sidebar.md) |
 | The time zone | [`tasks-projects-calendar.md`](tasks-projects-calendar.md) |
 | The trash | [`trash.md`](trash.md) |
+| The visual review | [`gate-and-releases.md`](gate-and-releases.md) |
 | Things that will bite | [`things-that-will-bite.md`](things-that-will-bite.md) |
 | Tidy up | [`groups-guides-tidy.md`](groups-guides-tidy.md) |
 | Turning AI off | [`settings.md`](settings.md) |

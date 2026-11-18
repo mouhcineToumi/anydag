@@ -1,0 +1,325 @@
+/* ---- the board list ---- */
+
+/*
+ * A dialog, and a permanent 232px column before that.
+ *
+ * The column replaced a `<select>` in the toolbar, because thirty boards in a dropdown is one
+ * visible line, no search, and no way to see the `reference/` set as a set. It answered all of
+ * that and then charged the canvas its width for ever — to show a list somebody consults for the
+ * two seconds it takes to switch. This is the same list, at the moment it is wanted.
+ *
+ * `dag-panel__*` below is deliberately *not* `dag-browser__*`: the search row, the scrolling list,
+ * the group heading, the "nothing here" line and the footer count are shared with the component
+ * library, which is a column down the right. They were called `dag-sidebar__*` while the board
+ * list was the sidebar, and one of the two surfaces using them is now a modal and the other was
+ * never a sidebar — so the name says what they are, which is the parts of a filterable list panel.
+ */
+.dag-browser {
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  max-width: calc(100% - 48px);
+  /* **As tall as its results, up to the same ceiling.** It used to be the ceiling on every search,
+     so one board and none were both a 560px card with two empty thirds — and a miss, which now has
+     something to offer, would have had the most empty space of all. The list is what grows. */
+  max-height: min(560px, calc(100% - 64px));
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-dialog);
+  box-shadow: var(--dag-ui-elevation-modal);
+  overflow: hidden;
+}
+
+.dag-panel__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+  color: var(--dag-color-slate);
+}
+.dag-panel__input {
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+  /* A field's own box is its line of text otherwise: 16px is under the 24 a pointer needs (#209). */
+  min-height: 24px;
+}
+.dag-panel__input::placeholder { color: var(--dag-color-slate); }
+.dag-panel__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-panel__clear:hover { color: var(--dag-color-ink); }
+
+.dag-panel__list {
+  /* `auto` rather than `0`: the card has no height of its own, so the list's content is what makes
+     it tall, and it shrinks — and scrolls — only once the card reaches its maximum. */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+/* The library's section label — `Generate`, `Shapes`, `Charts`. Micro-caps is the right treatment
+   for half a dozen prose headings and the wrong one for a tree, which is why the board browser's
+   folder heading stopped sharing this class rather than being argued into it. */
+.dag-panel__group + .dag-panel__group { margin-top: 12px; }
+.dag-panel__folder {
+  margin: 0 0 4px;
+  padding: 0 8px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+}
+.dag-panel__empty {
+  margin: 0;
+  padding: 8px;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+}
+/* An empty folder says so, and the line is also what a board can be dropped onto: a heading alone
+   is four pixels of target. */
+.dag-panel__empty--folder { padding: 4px 8px 6px; font-style: italic; }
+
+/*
+ * What a miss offers: the words somebody typed, as a board or a note.
+ *
+ * Rows of the same height and radius as the board rows, with the mark's column kept, so the card
+ * does not change shape between "found it" and "make it". The board comes first because Enter
+ * presses it; the words are the title, so they are the text, not a second field to fill in.
+ */
+.dag-hits__make { margin-top: 4px; }
+.dag-hits__new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-hits__new:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-hits__new:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-hits__new > svg { flex: none; color: var(--dag-color-muted); }
+.dag-hits__make-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- folders, as a tree ---- */
+
+/*
+ * A folder is structure, and it has to read as structure.
+ *
+ * It used to be `.dag-panel__folder` — 11px uppercase letterspaced `muted`, the quietest thing in
+ * the card — printing the *whole path* above boards indented exactly as far as a board at the top
+ * level. So the one line carrying the hierarchy was both the hardest to read and the only thing
+ * saying there was one. It is the same mono at the same size as the board names it governs now,
+ * in `ink` at 600 with the folder mark beside it: the contrast against a row is weight and colour
+ * rather than a different alphabet, and the leaf is all it says because the indent says the rest.
+ */
+
+.dag-browser__folder {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The indent, and the rule that makes it followable.
+ *
+ * The tree is lines placed by their offset, only those in view drawn (`BoardBrowser.tsx`, #267), so
+ * the indent is each line's own: 25px a level, and one rule per level at the horizontal centre of
+ * the folder mark above it — 15px is a row's 8px of padding plus half a 14px icon — so four levels
+ * of nesting are four lines a reader can walk back up. The rules run the line's full height, its
+ * 2px gap included, so they join from one line to the next.
+ */
+.dag-browser__rows { position: relative; }
+.dag-browser__line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  padding-left: calc(var(--depth, 0) * 25px);
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0 15px,
+    var(--dag-color-outlineSoft) 15px 16px,
+    transparent 16px 25px
+  );
+  background-size: calc(var(--depth, 0) * 25px) 100%;
+  background-repeat: no-repeat;
+}
+
+.dag-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: var(--dag-ui-radius-control);
+  color: var(--dag-color-slate);
+}
+.dag-folder-row:hover { background: var(--dag-color-paper100); }
+.dag-folder-row > svg { flex: none; }
+.dag-board {
+  display: block;
+  width: 100%;
+  font: inherit;
+  /* Inter: the row says a title, which is words, not a string to type. */
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  padding: 6px 8px;
+  cursor: pointer;
+  /* A long name is truncated rather than wrapped: the rows stay one height, and the `title`
+     attribute carries the whole path for anyone who needs it. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dag-board:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+/* The row is draggable, so the browser's own text selection and touch scrolling must not claim
+   the gesture first — the same reason the canvas sets it. */
+.dag-board { touch-action: none; }
+.dag-board:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-board--on { color: var(--dag-color-ink); background: var(--dag-color-paper200); font-weight: var(--dag-ui-weight-strong); }
+/* A file found by name and in its text: the row is its one entry, and this says the second half. */
+.dag-board__also { font-weight: var(--dag-ui-weight-regular); font-style: italic; }
+/* Under a tag and no words, a row says its kind at its end; a tag offered for `#` says its count. */
+.dag-board__what { float: right; margin-left: 12px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+/* The tag chip in the search box (#327): a read-only chip with its ×, before the words. */
+.dag-tag--x { padding-right: 0; }
+.dag-panel__search > svg { flex: none; }
+.dag-board > .dag-tag__dot { display: inline-block; vertical-align: 0; margin-right: 10px; }
+.dag-tag--x .dag-tag__remove.dag-icon { width: var(--dag-ui-control-sm); height: var(--dag-ui-control-sm); }
+
+/* Matches in the text of every board and note, under the names in the search card. Two
+   lines a row, because a match is two facts: where it is, and the words around it. The words are
+   the reader's register, not the file's, so they are set in the sans and only the document name
+   keeps the mono the names above it wear. Names grepped first: `dag-hit*` and `data-dag-hit*` were
+   nobody's, and the section is not `.dag-panel__folder`, which the library owns. */
+.dag-hits { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--dag-color-outlineSoft); }
+/* With no name left standing, the matches are the whole list and a rule above them divides nothing. */
+.dag-hits:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.dag-hits__head {
+  margin: 0;
+  padding: 6px 8px 4px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+}
+.dag-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-hit:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-hit:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-hit__where { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.dag-hit__where svg { flex: none; color: var(--dag-color-muted); }
+.dag-hit__doc {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-ink);
+}
+.dag-hit__what { flex: none; margin-left: auto; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-hit__text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding-left: 20px;
+  font-size: var(--chrome-text-sm);
+  line-height: 1.45;
+}
+.dag-hit__text mark {
+  color: var(--dag-color-ink);
+  background: var(--dag-color-accentSoft);
+  border-radius: 2px; /* a highlight a line tall */
+  font-weight: var(--dag-ui-weight-strong);
+}
+
+/* The row: the board's own button. The sidebar holds its file actions now, and their
+   rules moved with them. */
+.dag-board-row { position: relative; display: flex; align-items: center; }
+.dag-board-row .dag-board { flex: 1; min-width: 0; }
+
+.dag-panel__count {
+  flex: none;
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--dag-color-outlineSoft);
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+}
+
+/*
+ * New note from template: the board browser's card (`dag-browser`), its field and its rows. What is
+ * its own is the folder a nested template sits in, said quietly after its title, and the empty
+ * state's line over its one button. Names claimed, grepped first: `dag-templates`,
+ * `dag-templates__where`, `dag-templates__none`, `dag-templates__problem`, `data-dag-templates*`,
+ * `data-dag-template`, `data-dag-template-makes`, `data-dag-sidebar-new-template`,
+ * `data-dag-hits-new-from-template`, `data-dag-setting-templates*`.
+ */
+.dag-templates__where { color: var(--dag-color-slate); }
+.dag-templates__none { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 0 8px 8px; }
+.dag-templates__none .dag-panel__empty { padding-left: 0; }
+.dag-templates__problem { color: var(--dag-color-dangerText); }
+
+/* The search on a phone: the field, its clear button and every row are a finger's height. */
+@media (max-width: 719px) {
+  .dag-browser { max-width: calc(100% - 24px); height: min(640px, calc(100% - 32px)); }
+  .dag-panel__search { padding: 8px 12px; }
+  .dag-panel__input { min-height: 44px; font-size: var(--chrome-text-lg); }
+  .dag-panel__clear { width: 44px; height: 44px; }
+  .dag-board { min-height: 44px; padding: 12px 8px; }
+  .dag-hit { min-height: 44px; padding: 10px 8px; }
+}
+

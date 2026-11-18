@@ -75,6 +75,17 @@
   color: "5319e7"
   description: "Workflows, checks, releases and repository tooling"
 
+# --- How a bug is qualified ---------------------------------------------------------------------
+# Applied at triage, from the bug form's *AnyDag version* field and from what the report says. They
+# feed the development health report (`docs/metrics/README.md`); neither is a severity, and neither
+# replaces `type: bug`.
+- name: "regression"
+  color: "e99695"
+  description: "A bug in something that used to work"
+- name: "escaped"
+  color: "b60205"
+  description: "A bug present in a stable release; it escaped the gate"
+
 # --- How big ------------------------------------------------------------------------------------
 # Every `status: ready` issue carries exactly one of these: a person's time, not the model's
 # reasoning (that is `agent:` below). `issue-policy` and `pr-policy` enforce it.

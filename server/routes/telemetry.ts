@@ -13,21 +13,19 @@
 import type { Hono } from "hono";
 
 import type { Session } from "../context";
-import { bodyOf, err } from "../http";
+import { bodyAs } from "../http";
+import { ConsentBody, EventsBody } from "../schema/cloud";
 
 export function telemetryRoutes(app: Hono, s: Session): void {
   app.get("/api/telemetry", (c) => c.json(s.telemetry.status()));
 
   app.put("/api/telemetry", async (c) => {
-    const { enabled } = await bodyOf(c);
-    if (enabled !== true && enabled !== false && enabled !== null)
-      throw err(400, "`enabled` is true, false, or null to be asked again");
+    const { enabled } = await bodyAs(c, ConsentBody);
     return c.json(s.telemetry.setConsent(enabled));
   });
 
   app.post("/api/telemetry/events", async (c) => {
-    const { events } = await bodyOf(c);
-    if (!Array.isArray(events)) throw err(400, "expected `events` to be a list");
+    const { events } = await bodyAs(c, EventsBody);
     return c.json({ accepted: s.telemetry.record(events) });
   });
 }

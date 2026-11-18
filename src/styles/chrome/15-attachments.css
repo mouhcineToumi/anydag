@@ -1,0 +1,133 @@
+/* ---- Attachments ---------------------------------------------------------------------
+   An attachment's own page (`?file=`), the pdf.js viewer, and a file embedded in a note or placed on
+   a board. Chrome, so lengths are the chrome's and every colour a `--dag-*`. Names grepped first:
+   `dag-file*`, `dag-pdf*`, `dag-app--file`, `dag-embed--file`, `dag-embed--picture`,
+   `dag-embed__filerow`, `dag-embed__preview`, `dag-embed__chev--open`, and `data-dag-file*`,
+   `data-dag-pdf*`, `data-dag-embed-picture`, `data-dag-embed-preview*`, `data-dag-embed-download`,
+   `data-dag-unlink*` and `data-dag-sidebar-upload*` were all unclaimed. */
+.dag-file {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--dag-color-paper);
+  color: var(--dag-color-ink);
+}
+.dag-file__head { max-width: 960px; margin: 0 auto; padding: 40px 0 0; }
+/* The title field is a note's (`NoteTitle`), and its gutter is a note's too. */
+.dag-file__head .dag-note-title { margin-bottom: 8px; }
+.dag-file__head > .dag-note-title--read { max-width: none; width: auto; margin: 0 54px 8px; padding: 0; }
+.dag-file__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 54px 20px;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-slate);
+}
+.dag-file__save,
+.dag-file__download {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  color: var(--dag-color-ink);
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  text-decoration: none;
+}
+.dag-file__save:hover,
+.dag-file__download:hover { background: var(--dag-color-paper100); }
+.dag-file__body { max-width: 960px; margin: 0 auto; padding: 0 54px 96px; }
+.dag-file__figure { margin: 0; text-align: center; }
+.dag-file__image {
+  max-width: 100%;
+  max-height: 78vh;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  background: var(--dag-color-card);
+}
+.dag-file__played { display: flex; justify-content: center; }
+.dag-file__audio { width: 100%; max-width: 640px; }
+.dag-file__video { max-width: 100%; max-height: 78vh; border-radius: var(--dag-ui-radius-control); background: var(--dag-color-ink); }
+.dag-file__text {
+  margin: 0;
+  padding: 16px 20px;
+  max-height: 78vh;
+  overflow: auto;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  background: var(--dag-color-card);
+  font: 13px/1.5 var(--dag-font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dag-file__block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 24px auto;
+  padding: 40px 24px;
+  max-width: 420px;
+  border: 1px dashed var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  color: var(--dag-color-slate);
+  text-align: center;
+}
+.dag-file__block-name { font-size: var(--chrome-text-xl); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); overflow-wrap: anywhere; }
+.dag-file__block-what { font-size: var(--chrome-text-md); }
+.dag-file__block .dag-file__download { margin-top: 8px; }
+.dag-file__none { max-width: 820px; margin: 48px auto; padding: 0 54px; color: var(--dag-color-slate); }
+
+/* The PDF: a bar with the page count and the zoom, and the pages down a grey well. */
+.dag-pdf { display: flex; flex-direction: column; gap: 8px; }
+.dag-pdf__bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  background: var(--dag-color-card);
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+}
+.dag-pdf__count { flex: 1; }
+.dag-pdf__zoom { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.dag-pdf__pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: var(--dag-ui-radius-surface);
+  background: var(--dag-color-paper100);
+}
+.dag-pdf__page { flex: none; background: var(--dag-color-card); box-shadow: var(--dag-ui-elevation-raised); }
+
+/* A file in a note: a picture drawn, anything else a card whose Preview opens it in place. */
+.dag-embed.dag-embed--picture { margin: 0; border: none; background: transparent; }
+.dag-embed--picture img { display: block; max-width: 100%; border-radius: var(--dag-ui-radius-control); }
+.dag-embed.dag-embed--file { width: 100%; }
+.dag-embed__filerow { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 0 8px 0 12px; }
+.dag-embed.dag-embed--placed.dag-embed--file { padding: 0; }
+.dag-embed--placed.dag-embed--file .dag-embed__filerow { flex: 1; height: 100%; }
+.dag-embed__preview { padding: 12px; border-top: 1px solid var(--dag-color-outlineSoft); background: var(--dag-color-paper); }
+.dag-embed__preview .dag-pdf__pages { max-height: 70vh; overflow: auto; }
+.dag-embed__chev--open { transform: rotate(180deg); }
+/* A refusal's backticked name — `.exe`, a file's name — drawn as code wherever one is said. */
+.dag-said__code {
+  font-family: var(--dag-font-mono);
+  /* em: relative to the sentence it sits in, not a chrome step. */
+  font-size: 0.92em;
+  padding: 0 3px;
+  border-radius: 3px; /* inline code a line tall */
+  background: color-mix(in srgb, var(--dag-color-ink) 7%, transparent);
+  overflow-wrap: anywhere;
+}

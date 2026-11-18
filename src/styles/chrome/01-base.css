@@ -1,0 +1,521 @@
+/*
+ * The app around the board: toolbar, pickers, and the two cards that report trouble.
+ *
+ * Not held to the diagram surface's length rule: none of this is a diagram, it is never exported,
+ * and no theme has an opinion about the height of one zoom button. Colours still come from the
+ * theme, because the chrome has to sit next to the board without arguing with it — and the colour
+ * rule admits no exceptions anywhere in `src/`.
+ *
+ * What it does have is its own scale, the theme's `ui` family (#205): `--dag-ui-text-*`,
+ * `-leading-*`, `-weight-*`, `-radius-*`, `-elevation-*`, `-layer-*`, `-motion-*`, `-control-*`,
+ * `-focus-*` and `-space-*`. A font size reads `--chrome-text-*`, the theme's `ui.text.*` steps at
+ * the person's text size (#325, below); a corner, shadow, layer or duration reads its `--dag-ui-*`
+ * token. Not a number and not a diagram token (`--dag-metric-radius-chip` is a diagram chip's
+ * corner). `scripts/check-literals.mjs` counts the rules that still type their own against
+ * `scripts/chrome-literals.json`, and the count only goes down. A component's own stacking
+ * (`z-index` 1–9) and an inset ring are structure, not scale, and are not counted.
+ */
+
+/*
+ * ---- The person's text size (#325) ---------------------------------------------
+ *
+ * One preference, in Settings → Appearance: how big the words a person reads are. It reaches two
+ * places and only two — the chrome's type, and a note's own Markdown ramp (`markdown.css` and
+ * `blocks.css`, restated for `.dag-note-view` further down). **The diagram surface is not one of
+ * them**: a board reads `--dag-type-*` and `--dag-metric-*` directly, and it has its own zoom.
+ *
+ * The steps are `src/ui/textSize.ts`'s; the attribute is written on `<html>` before the first
+ * render. It is 1 under `?snapshot=1`, which reads no preference, and while a page is being
+ * printed, so a picture of a board and a PDF of a note stay facts about the document.
+ *
+ * `--chrome-text-*` are the chrome's composition of the theme's tokens, like `--focus-ring`: a name
+ * without the `--dag-` prefix, which `check-theme.mjs` reads as a token every theme must carry. They
+ * are computed on `:root` from `--text-scale`, so the print rule above just puts the scale back
+ * before they are read.
+ */
+:root { --text-scale: 1; }
+:root[data-dag-text-size="small"]:not([data-dag-printing]) { --text-scale: 0.9; }
+:root[data-dag-text-size="large"]:not([data-dag-printing]) { --text-scale: 1.15; }
+
+:root {
+  --chrome-text-xs: calc(var(--dag-ui-text-xs) * var(--text-scale));
+  --chrome-text-sm: calc(var(--dag-ui-text-sm) * var(--text-scale));
+  --chrome-text-md: calc(var(--dag-ui-text-md) * var(--text-scale));
+  --chrome-text-lg: calc(var(--dag-ui-text-lg) * var(--text-scale));
+  --chrome-text-xl: calc(var(--dag-ui-text-xl) * var(--text-scale));
+  --chrome-text-title: calc(var(--dag-ui-text-title) * var(--text-scale));
+  --chrome-text-display: calc(var(--dag-ui-text-display) * var(--text-scale));
+}
+
+/*
+ * Elevation is three tokens (`ui.elevation.raised`, `overlay`, `modal`), each drawn in the theme's
+ * `color.shadow` and the same geometry on every theme: a small lift, a menu or floating panel, a
+ * dialog. A layer is one of five (`ui.layer`: chrome 10, popover 20, modal 30, toast 40, tooltip 50);
+ * a `z-index` of 1–9 orders siblings inside one component and is not a layer.
+ */
+
+/*
+ * The one focus ring the chrome draws: a gap in the surface's own colour, then a band of accent —
+ * `ui.focus.offset` and `ui.focus.width`, 2px and 2px in every theme today. `--focus-ring-inset` is
+ * the same ring for a row or a menu item, whose neighbours would cover the outer half. Neither
+ * name takes the `--dag-` prefix: they are the chrome's composition of the theme's tokens, and
+ * `check-theme.mjs` reads that prefix as a token every folder must carry.
+ */
+:root {
+  --focus-ring: 0 0 0 var(--dag-ui-focus-offset) var(--dag-color-card),
+    0 0 0 calc(var(--dag-ui-focus-offset) + var(--dag-ui-focus-width)) var(--dag-color-accent);
+  --focus-ring-inset: inset 0 0 0 var(--dag-ui-focus-width) var(--dag-color-accent);
+}
+
+/*
+ * Every control in the shell's five regions takes the ring above, so a control added later cannot
+ * arrive wearing the browser's own black one. `:where()` keeps this at no specificity: every rule
+ * below still wins, and a row that needs the inset ring says so itself.
+ */
+:where(.dag-toolbar, .dag-sidebar, .dag-pagebar, .dag-doctabs, .dag-dock, .dag-zoombar)
+  :where(button, a[href], input, select, textarea, summary):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/*
+ * The room the macOS window's traffic lights take at its top-left corner, in the desktop app, where
+ * the window has no title bar of its own (`desktop/main.ts`, #78). `src/ui/windowInset.ts` puts
+ * `data-dag-window="inset"` on the root there, and takes it off in full screen, where the lights
+ * are not drawn. Everywhere else it is nothing. What is pushed right by it is whatever sits at the
+ * window's left edge in the top 48px: the sidebar's toggle, the sidebar's head, and the toolbar
+ * while the column is away. No `--dag-` prefix: that is the theme's (`check-theme.mjs`).
+ */
+:root { --window-inset: 0px; }
+:root[data-dag-window="inset"] { --window-inset: 64px; }
+
+/*
+ * The page's header is the top edge of the page, not a strip laid over it (#78). It has no rule
+ * under it and the page's own ground, so the title reads as the page's and the sidebar's head
+ * beside it reads as the same row. The height stays 48px: `pages.spec.ts` measures this element to
+ * know where the board starts, and `box-sizing: border-box` means the rule never counted.
+ */
+.dag-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 16px;
+  flex: none;
+  background: var(--dag-color-paper);
+  font-size: var(--chrome-text-md);
+}
+/* At the window's left edge — the column away — it keeps clear of the traffic lights. */
+.dag-toolbar[data-dag-toolbar-edge] { padding-left: calc(16px + var(--window-inset)); }
+
+/*
+ * With no title bar, the window is dragged by its top row: the header and the sidebar's head.
+ * Everything in them that takes a press is cut out of the region, or Electron would take the
+ * press for a drag. The toggle is drawn over the head rather than in it, so it is named too.
+ */
+[data-dag-window] :is(.dag-toolbar, .dag-sidebar__head) { -webkit-app-region: drag; }
+[data-dag-window] :is(.dag-toolbar, .dag-sidebar__head) :is(button, a, input, select, textarea, [role], [tabindex], [contenteditable]),
+[data-dag-window] .dag-sidebar-toggle { -webkit-app-region: no-drag; }
+.dag-toolbar__title { font-weight: var(--dag-ui-weight-strong); letter-spacing: -0.006em; }
+.dag-toolbar__spacer { flex: 1; }
+/* The two arrows that walk the window's history. No rule of their own: an `IconButton` is the
+   tool the bar already draws, and the pair is a group so a screen reader hears what they are. */
+.dag-toolbar__history { display: flex; align-items: center; gap: 2px; flex: none; margin-right: 2px; }
+
+/* The board's name, and the control that lists the rest. One thing rather than the name beside a
+   `PanelLeft` toggle, because there is no column to toggle — and the name is where a
+   reader looks first when they want to know what else there is. */
+.dag-toolbar__board {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 420px;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-control);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.dag-toolbar__board:hover { background: var(--dag-color-paper100); }
+.dag-toolbar__board:focus-visible { box-shadow: var(--focus-ring); }
+.dag-toolbar__board .dag-toolbar__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-toolbar__board > svg { flex: none; color: var(--dag-color-muted); }
+
+/*
+ * The chrome's controls (`src/ui/controls.tsx`): a select, a switch, a box to tick, a field with its
+ * unit inside, and a plain button. Each is the browser's own element drawn our way, so the keyboard,
+ * a screen reader and Playwright all still know it. The select's chevron is two gradients rather than
+ * an image, because an image cannot take a theme colour and a colour may only come from a token.
+ */
+.dag-select {
+  appearance: none;
+  max-width: 100%;
+  height: 30px;
+  padding: 0 28px 0 10px;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  text-overflow: ellipsis;
+  color: var(--dag-color-ink);
+  background-color: var(--dag-color-card);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--dag-color-slate) 50%),
+    linear-gradient(135deg, var(--dag-color-slate) 50%, transparent 50%);
+  background-position: calc(100% - 15px) calc(50% + 1px), calc(100% - 11px) calc(50% + 1px);
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-select:hover:not(:disabled) { border-color: var(--dag-color-mutedBorder); }
+.dag-select:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-select:disabled { opacity: 0.55; cursor: default; }
+
+.dag-switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  background: var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-pill);
+  cursor: pointer;
+  transition: background-color var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
+}
+.dag-switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--dag-color-card);
+  border-radius: 50%;
+  box-shadow: var(--dag-ui-elevation-raised);
+  transition: transform var(--dag-ui-motion-base) var(--dag-ui-motion-ease);
+}
+.dag-switch:checked { background: var(--dag-color-accent); }
+.dag-switch:checked::before { transform: translateX(14px); }
+.dag-switch:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.dag-switch:disabled { opacity: 0.55; cursor: default; }
+
+.dag-check {
+  appearance: none;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  background: var(--dag-color-card);
+  border: 1.5px solid var(--dag-color-mutedBorder);
+  border-radius: 4px; /* a 16px box: the control corner would make it a circle */
+  cursor: pointer;
+}
+.dag-check::before {
+  content: "";
+  width: 8px;
+  height: 4px;
+  margin-top: -2px;
+  border-left: 2px solid var(--dag-color-card);
+  border-bottom: 2px solid var(--dag-color-card);
+  transform: rotate(-45deg);
+  opacity: 0;
+}
+.dag-check:checked { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-check:checked::before { opacity: 1; }
+.dag-check:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* A quiz's ticks are a finger's or a pointer's target, and 16px is neither (#209). The box is 24
+   and the glyph inside it is unchanged; Settings is out of this issue's scope (#188). */
+.dag-quiz .dag-check,
+.dag-flashcards .dag-check { width: 24px; height: 24px; }
+
+.dag-textfield {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 140px;
+  max-width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-textfield--wide { width: 240px; }
+.dag-textfield:hover { border-color: var(--dag-color-mutedBorder); }
+.dag-textfield:focus-within { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-textfield > input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.dag-textfield > input::placeholder { color: var(--dag-color-slate); }
+.dag-textfield > input[type="number"] { -moz-appearance: textfield; }
+.dag-textfield > input::-webkit-inner-spin-button, .dag-textfield > input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.dag-textfield__suffix { flex: none; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+
+/*
+ * The model picker (`src/ui/ModelPicker.tsx`): one control for the three places a model was chosen.
+ * The button is the closed control; the popover is portalled to the body so a settings pane's
+ * overflow cannot clip it, and kept inside the viewport with a fixed position.
+ */
+.dag-modelpicker { position: relative; display: inline-flex; min-width: 0; max-width: 100%; }
+.dag-modelpicker__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-modelpicker__button:hover:not(:disabled) { border-color: var(--dag-color-mutedBorder); }
+.dag-modelpicker__button:focus-visible {
+  outline: none;
+  border-color: var(--dag-color-accent);
+  box-shadow: var(--focus-ring);
+}
+.dag-modelpicker__button:disabled { opacity: 0.55; cursor: default; }
+.dag-modelpicker__current { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.dag-modelpicker__chevron { flex: none; color: var(--dag-color-slate); }
+.dag-provider-mark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--dag-color-slate); }
+.dag-provider-mark--name { width: auto; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); white-space: nowrap; }
+.dag-modelpicker__popover {
+  position: fixed;
+  z-index: calc(var(--dag-ui-layer-modal) + 1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 6px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-modelpicker__search { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 8px; border-bottom: 1px solid var(--dag-color-outlineSoft); }
+.dag-modelpicker__searchIcon { flex: none; color: var(--dag-color-muted); }
+.dag-modelpicker__searchInput {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.dag-modelpicker__searchInput::placeholder { color: var(--dag-color-slate); }
+.dag-modelpicker__list { min-height: 0; overflow-y: auto; padding-top: 4px; }
+.dag-modelpicker__grouphead { display: flex; align-items: center; gap: 6px; padding: 8px 8px 4px; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); letter-spacing: 0.03em; text-transform: uppercase; color: var(--dag-color-slate); }
+.dag-modelpicker__provider { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-modelpicker__status { flex: none; font-size: var(--chrome-text-xs); font-weight: var(--dag-ui-weight-strong); letter-spacing: 0; text-transform: none; color: var(--dag-color-slate); }
+.dag-modelpicker__status[data-dag-model-ready="0"] { color: var(--dag-color-dangerText); }
+/* Status is a dot and a word, never the word alone (#186): the same dot the provider pills wear. */
+.dag-modelpicker__status { display: inline-flex; align-items: center; gap: 5px; }
+.dag-modelpicker__status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dag-color-success); }
+.dag-modelpicker__status[data-dag-model-ready="0"]::before { background: var(--dag-color-danger); }
+.dag-modelpicker__option { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border-radius: var(--dag-ui-radius-control); cursor: pointer; }
+.dag-modelpicker__option--active { background: var(--dag-color-accentSoft); }
+.dag-modelpicker__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dag-modelpicker__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--chrome-text-md); color: var(--dag-color-ink); }
+.dag-modelpicker__id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--dag-font-mono); font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-modelpicker__check { flex: none; color: var(--dag-color-accent); }
+.dag-modelpicker__custom { display: flex; flex-direction: column; gap: 8px; padding: 6px; overflow-y: auto; }
+.dag-modelpicker__back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 2px 4px; font: inherit; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); background: none; border: none; cursor: pointer; }
+.dag-modelpicker__back:hover { color: var(--dag-color-ink); }
+.dag-modelpicker__customLine { margin: 0; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+.dag-modelpicker__customForm { display: flex; align-items: center; gap: 6px; }
+.dag-modelpicker__customInput {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  outline: none;
+}
+.dag-modelpicker__customInput:focus-visible { border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-modelpicker__note { margin: 0; font-size: var(--chrome-text-sm); line-height: 1.5; color: var(--dag-color-slate); }
+/* The picker is opened from Settings, so at phone width its list is a finger's too. */
+@media (max-width: 719px) {
+  .dag-modelpicker__searchInput { height: 44px; }
+  .dag-modelpicker__option { min-height: 44px; }
+  .dag-modelpicker__back { min-height: 44px; }
+  .dag-modelpicker__customInput { height: 44px; }
+  .dag-modelpicker__popover .dag-button { height: 44px; }
+}
+
+/* Settings' provider list: one row per provider, its state as a pill, its setup under it. The pill's
+   colours are the theme's status families, so a theme decides what Ready and Needs a key look like. */
+.dag-settings-modal__dot { flex: none; width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: var(--dag-color-warning); }
+.dag-providers__scope { max-width: 68ch; margin: 0 2px 12px; font-size: var(--chrome-text-md); line-height: 1.5; color: var(--dag-color-slate); }
+.dag-providers { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.dag-providers__row { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; }
+.dag-providers__row + .dag-providers__row { border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-providers__head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.dag-providers__mark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--dag-color-ink); }
+.dag-providers__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dag-providers__name { font-size: var(--chrome-text-md); font-weight: var(--dag-ui-weight-strong); color: var(--dag-color-ink); }
+.dag-providers__desc { font-size: var(--chrome-text-md); line-height: 1.45; color: var(--dag-color-slate); text-wrap: pretty; }
+.dag-providers__pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  white-space: nowrap;
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-providers__pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dag-color-warning); }
+.dag-providers__pill[data-dag-provider-pill="ready"] { color: var(--dag-color-successText); background: var(--dag-color-successSoft); }
+.dag-providers__pill[data-dag-provider-pill="ready"]::before { background: var(--dag-color-success); }
+.dag-providers__pill[data-dag-provider-pill="not-installed"],
+.dag-providers__pill[data-dag-provider-pill="not-ready"] { color: var(--dag-color-slate); background: var(--dag-color-paper100); }
+.dag-providers__pill[data-dag-provider-pill="not-installed"]::before,
+.dag-providers__pill[data-dag-provider-pill="not-ready"]::before { background: var(--dag-color-slate); }
+.dag-providers__why { margin: 0 0 0 30px; max-width: 68ch; font-size: var(--chrome-text-md); line-height: 1.5; color: var(--dag-color-slate); text-wrap: pretty; }
+.dag-providers__why code { font-family: var(--dag-font-mono); font-size: var(--chrome-text-sm); }
+.dag-providers__setup { display: flex; flex-direction: column; gap: 8px; margin-left: 30px; }
+.dag-providers__field { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px; }
+.dag-providers__label { font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-providers__setup .dag-settings__actions { flex-wrap: wrap; margin-top: 0; }
+.dag-providers__test { font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-providers__test[data-dag-provider-test="ok"] { color: var(--dag-color-successText); }
+.dag-providers__test[data-dag-provider-test="fail"] { color: var(--dag-color-dangerText); }
+.dag-providers__check {
+  padding: 0;
+  font: inherit;
+  color: var(--dag-color-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dag-providers__check:focus-visible { box-shadow: var(--focus-ring); border-radius: var(--dag-ui-radius-control); }
+@media (max-width: 719px) {
+  .dag-providers__row { padding: 12px; }
+  .dag-providers__why, .dag-providers__setup { margin-left: 0; }
+  .dag-providers__field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+.dag-modelpicker__suggest { padding: 0; font: inherit; font-size: var(--chrome-text-sm); color: var(--dag-color-accent); background: none; border: none; text-decoration: underline; cursor: pointer; }
+.dag-modelpicker__hint { margin: 0; font-size: var(--chrome-text-xs); line-height: 1.45; color: var(--dag-color-slate); }
+.dag-effort { max-width: 100%; }
+.dag-settings__control > .dag-modelpicker { width: 260px; }
+.dag-settings__control > .dag-effort { width: 200px; }
+
+/*
+ * `Button` and `IconButton` (`src/ui/controls.tsx`, #207). Every number is a `ui` token: the
+ * height is `--dag-ui-control-<size>`, the corner `--dag-ui-radius-control`, the words
+ * `--chrome-text-*`. `.dag-button` alone is still the secondary at `md`, for the screens that have
+ * not moved onto the component yet. Names grepped first: `dag-button--{secondary,quiet,sm,md,touch}`
+ * and `dag-icon--{sm,md,touch,danger}` were nobody's.
+ */
+.dag-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--dag-ui-control-md);
+  padding: 0 12px;
+  font: inherit;
+  font-family: var(--dag-font-sans);
+  font-size: var(--chrome-text-md);
+  font-weight: var(--dag-ui-weight-strong);
+  white-space: nowrap;
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-button > svg { flex: none; color: var(--dag-color-slate); }
+.dag-button:hover:not(:disabled) { background: var(--dag-color-paper100); border-color: var(--dag-color-mutedBorder); }
+.dag-button:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-button:disabled { opacity: 0.5; cursor: default; }
+.dag-button--sm { gap: 4px; height: var(--dag-ui-control-sm); padding: 0 8px; font-size: var(--chrome-text-sm); }
+.dag-button--touch { gap: 8px; height: var(--dag-ui-control-touch); padding: 0 16px; }
+/* No box: words that act, where a row of bordered buttons would be louder than what they act on. */
+.dag-button--quiet { color: var(--dag-color-slate); background: transparent; border-color: transparent; }
+.dag-button--quiet:hover:not(:disabled) { color: var(--dag-color-ink); background: var(--dag-color-paper100); border-color: transparent; }
+.dag-button--quiet > svg { color: inherit; }
+.dag-button--danger { color: var(--dag-color-dangerText); border-color: var(--dag-color-dangerBorder); }
+.dag-button--danger > svg { color: inherit; }
+.dag-button--danger:hover:not(:disabled) { background: var(--dag-color-dangerSoft); border-color: var(--dag-color-danger); }
+/*
+ * The one action a card is asking for: filled in the accent. It used to be spelled twice, scoped to
+ * the telemetry question and the chat card; it is the same button everywhere, so it lives here now.
+ * Disabled is a soft tint rather than the quiet button's half-opacity: the shape of the action stays
+ * on the card, and it reads as *not yet* instead of as a second secondary.
+ */
+.dag-button--primary { color: var(--dag-color-card); background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-button--primary > svg { color: inherit; }
+.dag-button--primary:hover:not(:disabled) { background: var(--dag-color-accent); border-color: var(--dag-color-accent); opacity: 0.9; }
+.dag-button--primary:disabled {
+  color: var(--dag-color-slate);
+  background: var(--dag-color-accentSoft);
+  border-color: var(--dag-color-accentSoft);
+  opacity: 1;
+}
+
+/*
+ * The toolbar sits above a row: the board list, then the plane. `min-height` and `min-width` are
+ * the flexbox tax — without them a long list stretches the page and the viewport refuses to
+ * shrink.
+ *
+ * It is also the containing block for five absolutely-positioned things — the dock, the
+ * selection bar, the problems dock, the which-key strip and the zoom cluster — and it spans the
+ * board list and the panels as well as the drawing. So `left: 50%` was the middle of the *window*
+ * and `right: 12px` its right edge: open the library and the zoom cluster was drawn on top of it,
+ * open the list and everything centred sat left of the board it belongs to.
+ *
+ * `App` publishes the canvas box here as `--canvas-x` and `--canvas-w` from a ResizeObserver —
+ * see the comment there for why it is painted and why the names have no `--dag-` prefix. The
+ * fallbacks are what the rules meant before, so a frame rendered ahead of the first paint is the
+ * old behaviour rather than a collapse.
+ */
+.dag-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  --canvas-mid: calc(var(--canvas-x, 0px) + var(--canvas-w, 100%) / 2);
+  /* The gap between the canvas's right edge and the body's, which is whatever panels are open. */
+  --canvas-right: calc(100% - var(--canvas-x, 0px) - var(--canvas-w, 100%));
+}
+

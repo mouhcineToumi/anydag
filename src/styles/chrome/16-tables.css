@@ -1,0 +1,463 @@
+/* ---- Tables ---------------------------------------------------------------------------
+   A table's page, its grid, and its card on a board or in a note. Chrome, so lengths are written
+   here and every colour is the theme's. `dag-table*` is left alone on purpose — `.dag-md table`
+   styles every Markdown table a board draws — so the names are `dag-grid*`, `dag-tablepage*` and
+   `dag-tablecard*`. The grid is drawn inside `.dag-md` when it is a card, and `.dag-md th`/`td` are
+   (0,1,1); every cell rule here is two classes deep to outrank them wherever it is drawn. */
+
+.dag-app--table { background: var(--dag-color-paper); color: var(--dag-color-ink); }
+/* Import is the quiz's Practice in shape, and quieter: it adds a tab, it is not what the page is for. */
+
+.dag-tablepage__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px 16px;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+  background: var(--dag-color-paper);
+}
+.dag-tablepage__pop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--dag-ui-radius-surface);
+  cursor: pointer;
+}
+.dag-tablepage__pop:hover { background: var(--dag-color-paper100); color: var(--dag-color-ink); }
+.dag-tablepage__pop[data-on] { color: var(--dag-color-accent); background: var(--dag-color-accentSoft); }
+.dag-tablepage__pop[aria-expanded="true"] { border-color: var(--dag-color-outline); }
+.dag-tablepage__pop:focus-visible { box-shadow: var(--focus-ring); }
+.dag-tablepage__count { padding: 0 6px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); white-space: nowrap; }
+.dag-tablepage__status { min-width: 0; overflow: hidden; font-size: var(--chrome-text-sm); color: var(--dag-color-warningText); white-space: nowrap; text-overflow: ellipsis; }
+.dag-tablepage__spacer { flex: 1; }
+.dag-tablepage__bar .dag-icon { width: 28px; height: 28px; }
+.dag-tablepage__bar .dag-icon:disabled { color: var(--dag-color-outline); background: transparent; cursor: default; }
+.dag-tablepage__description { flex: none; max-width: 760px; margin: 12px 16px 0; font-size: var(--chrome-text-md); color: var(--dag-color-slate); white-space: pre-wrap; }
+.dag-tablepage__scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px 48px; }
+.dag-tablepage__none,
+.dag-tablepage[data-dag-tablepage-missing] { padding: 32px 16px; }
+.dag-tablepage--loading { flex: 1; }
+.dag-tablepage__conflict {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+}
+.dag-tablepage__conflict > button {
+  min-height: 24px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+
+/* The status line's count of problems is a button: it takes you to the first. */
+.dag-tablepage__show {
+  min-height: 24px;
+  padding: 4px 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.dag-tablepage__show:focus-visible { box-shadow: var(--focus-ring); }
+
+/* A file's problems in words: above the grid for a tab's, in the card a mark opens for a column's or a row's. */
+.dag-tablepage__issues {
+  flex: none;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px 16px;
+  background: var(--dag-color-warningSoft);
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-tablepage__problems { margin: 0; padding: 0; list-style: none; }
+.dag-tablepage__problem { display: flex; gap: 8px; padding: 6px 0; font-size: var(--chrome-text-md); color: var(--dag-color-warningText); }
+.dag-tablepage__problem[data-severity="error"] { color: var(--dag-color-dangerText); }
+.dag-tablepage__problem-mark { flex: none; margin-top: 2px; }
+.dag-tablepage__problem-body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.dag-tablepage__problem-words { margin: 0; color: var(--dag-color-ink); }
+.dag-tablepage__problem-detail {
+  max-height: 72px;
+  margin: 0;
+  overflow: auto;
+  padding: 4px 8px;
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-xs);
+  color: var(--dag-color-slate);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outlineSoft);
+  border-radius: var(--dag-ui-radius-surface);
+  white-space: pre-wrap;
+}
+.dag-tablepage__problem-fixes { display: flex; flex-wrap: wrap; gap: 6px; }
+.dag-tablepage__problem-fix {
+  min-height: 24px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-tablepage__problem-fix:hover:not(:disabled) { background: var(--dag-color-paper100); }
+.dag-tablepage__problem-fix:disabled { color: var(--dag-color-muted); cursor: default; }
+.dag-tablepage__problem-fix:focus-visible { box-shadow: var(--focus-ring); }
+.dag-grid__menu > .dag-tablepage__problems { width: 320px; padding: 2px 8px; }
+
+/* Sort and Filter: a line per key or rule, in the grid's card. */
+.dag-tablepage__rules { display: flex; flex-direction: column; gap: 6px; min-width: 300px; padding: 4px; }
+.dag-tablepage__rule { display: flex; align-items: center; gap: 6px; }
+.dag-tablepage__rule select,
+.dag-tablepage__rule input {
+  min-width: 0;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-tablepage__rule input { flex: 1; width: 120px; }
+.dag-tablepage__rule select:focus-visible,
+.dag-tablepage__rule input:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-tablepage__rule .dag-icon { flex: none; width: 24px; height: 24px; }
+.dag-tablepage__rule-actions { display: flex; gap: 4px; }
+.dag-tablepage__hint { margin: 2px 4px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); }
+
+/* The grid. `separate`, so a sticky header keeps its border as the rows scroll under it. */
+.dag-grid-wrap { position: relative; width: max-content; min-width: 100%; outline: none; }
+.dag-grid-wrap:focus-visible .dag-grid__corner { box-shadow: var(--focus-ring-inset); }
+.dag-grid-wrap--empty { padding: 16px 0; }
+.dag-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: max-content;
+  font-size: var(--chrome-text-md);
+  line-height: 1.45;
+  color: var(--dag-color-ink);
+}
+.dag-grid__col--gutter { width: 44px; }
+.dag-grid__col--text { width: 220px; }
+.dag-grid__col--number { width: 120px; }
+.dag-grid__col--date { width: 132px; }
+.dag-grid__col--checkbox { width: 84px; }
+.dag-grid__col--select { width: 160px; }
+.dag-grid__col--link { width: 220px; }
+.dag-grid__col--add { width: 40px; }
+
+.dag-grid .dag-grid__head,
+.dag-grid .dag-grid__corner {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 34px;
+  padding: 0 8px;
+  font-size: var(--chrome-text-sm);
+  font-weight: var(--dag-ui-weight-strong);
+  text-align: left;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper100);
+  border-top: 1px solid var(--dag-color-outline);
+  border-bottom: 1px solid var(--dag-color-outline);
+  border-right: 1px solid var(--dag-color-outlineSoft);
+  user-select: none;
+}
+.dag-grid .dag-grid__corner { border-left: 1px solid var(--dag-color-outline); }
+.dag-grid--edit .dag-grid__head { cursor: pointer; }
+.dag-grid--edit .dag-grid__head:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+.dag-grid .dag-grid__head--add { padding: 0; text-align: center; cursor: default; }
+.dag-grid--read .dag-grid__head:first-child { border-left: 1px solid var(--dag-color-outline); }
+.dag-grid__head-in { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.dag-grid__head-in > svg { flex: none; color: var(--dag-color-muted); }
+.dag-grid__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-grid__head-in > .dag-grid__sorted { flex: none; color: var(--dag-color-accent); }
+.dag-grid__resize { position: absolute; top: 0; right: -3px; bottom: 0; z-index: 1; width: 6px; cursor: col-resize; }
+.dag-grid__resize:hover { background: var(--dag-color-accent); }
+.dag-grid .dag-grid__head[data-dag-grid-drop="before"] { box-shadow: inset 2px 0 0 var(--dag-color-accent); }
+.dag-grid .dag-grid__head[data-dag-grid-drop="after"] { box-shadow: inset -2px 0 0 var(--dag-color-accent); }
+.dag-grid__plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-grid__plus:hover { color: var(--dag-color-ink); background: var(--dag-color-paper200); }
+
+.dag-grid .dag-grid__cell {
+  height: 34px;
+  padding: 6px 8px;
+  vertical-align: top;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--dag-color-card);
+  border-top: 0;
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+  border-right: 1px solid var(--dag-color-outlineSoft);
+}
+.dag-grid--read .dag-grid__cell:first-child { border-left: 1px solid var(--dag-color-outlineSoft); }
+.dag-grid .dag-grid__cell--number { text-align: right; font-variant-numeric: tabular-nums; }
+.dag-grid .dag-grid__cell--checkbox { text-align: center; }
+.dag-grid .dag-grid__cell--add { background: transparent; border-right: 0; border-bottom-color: transparent; }
+.dag-grid--edit .dag-grid__cell:not(.dag-grid__cell--add) { cursor: cell; }
+.dag-grid .dag-grid__cell[data-dag-grid-active] { box-shadow: inset 0 0 0 2px var(--dag-color-accent); }
+/* A cell being edited lets its list of options out, over the rows under it and the header above. */
+.dag-grid .dag-grid__cell[data-dag-grid-editing] { position: relative; z-index: 3; overflow: visible; }
+.dag-grid tr[data-dag-grid-marked] > .dag-grid__cell { background: var(--dag-color-accentSoft); }
+.dag-grid tr[data-dag-grid-drop="before"] > * { box-shadow: inset 0 2px 0 var(--dag-color-accent); }
+.dag-grid tr[data-dag-grid-drop="after"] > * { box-shadow: inset 0 -2px 0 var(--dag-color-accent); }
+
+.dag-grid .dag-grid__gutter {
+  position: relative;
+  padding: 0 6px;
+  font-family: var(--dag-font-mono);
+  font-size: var(--chrome-text-xs);
+  font-weight: var(--dag-ui-weight-regular);
+  text-align: right;
+  vertical-align: middle;
+  color: var(--dag-color-slate);
+  background: var(--dag-color-paper);
+  border-left: 1px solid var(--dag-color-outline);
+  border-bottom: 1px solid var(--dag-color-outlineSoft);
+  border-right: 1px solid var(--dag-color-outline);
+  cursor: grab;
+  user-select: none;
+}
+.dag-grid__num { display: inline-block; }
+/* A problem's mark: on a header beside the name, in the gutter at its left, where a row's number never goes. */
+.dag-grid .dag-grid__flag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--dag-color-warningText);
+  background: var(--dag-color-warningSoft);
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-grid .dag-grid__flag[data-severity="error"] { color: var(--dag-color-dangerText); background: var(--dag-color-dangerSoft); }
+.dag-grid .dag-grid__flag:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-grid .dag-grid__gutter > .dag-grid__flag { position: absolute; top: 50%; left: 3px; transform: translateY(-50%); }
+.dag-grid__grip { display: none; vertical-align: middle; color: var(--dag-color-slate); }
+.dag-grid tr:hover > .dag-grid__gutter .dag-grid__num { display: none; }
+.dag-grid tr:hover > .dag-grid__gutter .dag-grid__grip { display: inline-block; }
+.dag-grid__rowresize { position: absolute; right: 0; bottom: -3px; left: 0; z-index: 1; height: 6px; cursor: row-resize; }
+.dag-grid__rowresize:hover { background: var(--dag-color-accent); }
+
+.dag-grid__value--unread {
+  color: var(--dag-color-dangerText);
+  text-decoration: underline wavy var(--dag-color-dangerBorder);
+  text-underline-offset: 3px;
+}
+.dag-grid__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--dag-color-card);
+  background: var(--dag-color-card);
+  border: 1.5px solid var(--dag-color-outline);
+  border-radius: 4px; /* a small box: the control corner would make it a circle */
+  vertical-align: top;
+}
+.dag-grid--edit .dag-grid__check { cursor: pointer; }
+.dag-grid__check[data-dag-grid-check="on"] { background: var(--dag-color-accent); border-color: var(--dag-color-accent); }
+.dag-grid__option {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 8px;
+  overflow: hidden;
+  font-size: var(--chrome-text-sm);
+  line-height: 1.5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: top;
+  color: var(--dag-color-ink);
+  background: var(--dag-t, var(--dag-color-paper100));
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-grid .dag-grid__link { color: var(--dag-color-accent); text-decoration: underline; text-decoration-color: var(--dag-color-outline); text-underline-offset: 2px; }
+
+/* A cell while it is edited: the field sits where the words were, on the card's own ground. */
+.dag-grid__input {
+  display: block;
+  width: 100%;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+}
+.dag-grid__input--number { text-align: right; }
+.dag-grid__pop-anchor { position: relative; }
+.dag-grid__options {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: -9px;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 4px;
+  white-space: normal;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-grid__options-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  text-align: left;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-grid__options-item:hover,
+.dag-grid__options-item[aria-selected="true"] { background: var(--dag-color-paper100); }
+.dag-grid__options-new,
+.dag-grid__options-clear { color: var(--dag-color-slate); }
+.dag-grid__options-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-grid__options-kind { flex: none; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+
+.dag-grid__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  color: var(--dag-color-slate);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-grid__add:hover { color: var(--dag-color-ink); background: var(--dag-color-paper100); }
+.dag-grid__empty { margin: 0 0 8px; font-size: var(--chrome-text-md); color: var(--dag-color-slate); }
+.dag-grid .dag-grid__more { padding: 6px 8px; font-size: var(--chrome-text-sm); color: var(--dag-color-slate); background: var(--dag-color-paper); border: none; }
+
+/* A column's or a row's menu, and the Sort and Filter cards: at the pointer, over everything. */
+.dag-grid__menu {
+  position: fixed;
+  z-index: var(--dag-ui-layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 220px;
+  padding: 4px;
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-surface);
+  box-shadow: var(--dag-ui-elevation-overlay);
+}
+.dag-grid__menu-field { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px 6px; font-size: var(--chrome-text-xs); color: var(--dag-color-slate); }
+.dag-grid__menu-field input {
+  padding: 5px 6px;
+  font: inherit;
+  font-size: var(--chrome-text-md);
+  color: var(--dag-color-ink);
+  background: var(--dag-color-card);
+  border: 1px solid var(--dag-color-outline);
+  border-radius: var(--dag-ui-radius-control);
+}
+.dag-grid__menu-field input:focus-visible { outline: none; border-color: var(--dag-color-accent); box-shadow: var(--focus-ring); }
+.dag-grid__menu-types { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; }
+.dag-grid__menu-type,
+.dag-grid__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  font: inherit;
+  font-size: var(--chrome-text-sm);
+  text-align: left;
+  color: var(--dag-color-ink);
+  background: transparent;
+  border: none;
+  border-radius: var(--dag-ui-radius-control);
+  cursor: pointer;
+}
+.dag-grid__menu-type > svg,
+.dag-grid__menu-item > svg { flex: none; color: var(--dag-color-slate); }
+.dag-grid__menu-type:hover,
+.dag-grid__menu-item:hover:not(:disabled) { background: var(--dag-color-paper100); }
+.dag-grid__menu-type[aria-checked="true"] { color: var(--dag-color-accent); background: var(--dag-color-accentSoft); }
+.dag-grid__menu-type[aria-checked="true"] > svg { color: var(--dag-color-accent); }
+.dag-grid__menu-item:disabled { color: var(--dag-color-muted); cursor: default; }
+.dag-grid__menu-item--danger,
+.dag-grid__menu-item--danger > svg { color: var(--dag-color-dangerText); }
+.dag-grid__menu-type:focus-visible,
+.dag-grid__menu-item:focus-visible { box-shadow: var(--focus-ring-inset); }
+.dag-grid__menu-sep { height: 1px; margin: 3px 2px; background: var(--dag-color-outlineSoft); }
+
+/* A table on a board, or in a note: its mark, its title, the tab and how many rows, then the rows. */
+.dag-embed.dag-tablecard { display: flex; flex-direction: column; width: 100%; }
+.dag-tablecard__head { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 8px 0 12px; }
+.dag-tablecard__mark { flex: none; color: var(--dag-color-slate); }
+.dag-tablecard__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dag-tablecard__title,
+.dag-tablecard__what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dag-tablecard__title { font-size: var(--chrome-text-lg); font-weight: var(--dag-ui-weight-strong); line-height: 1.3; color: var(--dag-color-ink); }
+.dag-tablecard__what { font-size: var(--chrome-text-sm); line-height: 1.3; color: var(--dag-color-slate); }
+.dag-tablecard__grid { overflow: hidden; border-top: 1px solid var(--dag-color-outlineSoft); }
+.dag-tablecard .dag-grid { margin: 0; font-size: var(--chrome-text-sm); border: none; border-radius: 0; background: transparent; }
+.dag-tablecard .dag-grid .dag-grid__head { position: static; height: 28px; border-top: 0; }
+.dag-tablecard .dag-grid .dag-grid__head:first-child,
+.dag-tablecard .dag-grid .dag-grid__cell:first-child { border-left: 0; }
+.dag-tablecard .dag-grid .dag-grid__cell { height: 28px; padding: 4px 8px; white-space: nowrap; text-overflow: ellipsis; }
+

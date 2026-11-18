@@ -1,0 +1,157 @@
+# The pull request's bench (#527): what a change does to the time a person waits on while editing.
+#
+#   plan     whether the change can reach what is measured — `scripts/bench-plan.mjs`, the rule
+#            `scripts/e2e-plan.mjs` uses for the browser suite, read for the built page and server.
+#            Prose, tests, CI config, the desktop shell and the api server run nothing.
+#   compare  the pull request's head and its merge base, each installed and built, and measured **on
+#            one runner, in one job, in turn**: `scripts/bench-compare.mjs` runs the head's
+#            `scripts/bench.mjs --only edit --sizes 1000` on each build three times, alternating, and
+#            compares the rounds. A runner's absolute numbers move with whatever shares its host; two
+#            builds measured side by side on it do not move between each other.
+#   comment  the table, in the job summary and as one comment on the pull request, updated in place.
+#
+# **Advisory.** `compare` goes red only on a large regression of a stable metric (at least 1.5x and
+# 50 ms slower, every head round above every base round, on a metric whose own base rounds are within
+# 1.5x of each other), and it is not a required check: it is in neither `CI passed` nor `e2e`, and the
+# merge queue reads only the required checks. It joins them once its runs show it does not go red on
+# noise; *The bench* in `docs/architecture/limits.md` keeps the record.
+#
+# In the Playwright image, like the e2e suite and the nightly's bench, for the same Chromium every run.
+name: bench
+
+on:
+  pull_request:
+    branches: [develop]
+
+concurrency:
+  group: bench-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+      base: ${{ steps.plan.outputs.base }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - id: plan
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # The merge base, not the base branch's tip: what the head was written on, so the only
+          # difference between the two builds is the pull request's own.
+          base="$(git merge-base "$PR_BASE" "$PR_HEAD")"
+          plan="$(node scripts/bench-plan.mjs --base "$base" --head "$PR_HEAD")"
+          echo "$plan"
+          run="$(printf '%s' "$plan" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).run)))')"
+          {
+            echo "run=$run"
+            echo "base=$base"
+          } >> "$GITHUB_OUTPUT"
+
+  compare:
+    name: base against head
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+      # Chromium's shared memory, as Playwright's own documentation asks of a container.
+      options: --ipc=host
+    defaults:
+      run:
+        shell: bash
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      npm_config_cache: /tmp/npm-cache
+      BASE: ${{ needs.plan.outputs.base }}
+      HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.base }}
+          path: base
+      - uses: actions/cache@v6
+        with:
+          path: /tmp/npm-cache
+          key: npm-bench-${{ hashFiles('head/package-lock.json', 'base/package-lock.json') }}
+          restore-keys: npm-bench-
+      # Each side its own install, because a pull request may change the lockfile. Scripts are off,
+      # as in the e2e job: `prepare` installs git hooks, and the native modules arrive prebuilt.
+      - name: install and build the base and the head
+        run: |
+          for side in base head; do
+            echo "::group::$side"
+            (cd "$side" && npm ci --ignore-scripts --no-audit --no-fund && npx vite build && node server/build.mjs)
+            echo "::endgroup::"
+          done
+      - name: compare
+        id: compare
+        run: |
+          set +e
+          node head/scripts/bench-compare.mjs --base base --head head --base-name "${BASE:0:7}" --head-name "${HEAD:0:7}" \
+            --rounds 3 --only edit --sizes 1000 --markdown bench.md --json bench-compare.json
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ -f bench.md ]; then cat bench.md >> "$GITHUB_STEP_SUMMARY"; fi
+          # 1 is a regression, said after the table is kept; anything else is a run that failed.
+          if [ "$code" != 0 ] && [ "$code" != 1 ]; then exit "$code"; fi
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: bench-compare
+          path: |
+            bench.md
+            bench-compare.json
+          retention-days: 30
+          if-no-files-found: ignore
+      - name: slower
+        if: steps.compare.outputs.code == '1'
+        run: |
+          echo "::error::the head is slower than its base on a stable metric — see the job summary"
+          exit 1
+
+  comment:
+    name: comment
+    needs: [plan, compare]
+    if: ${{ !cancelled() && needs.plan.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: bench-compare
+      # One comment per pull request, found again by the marker `bench-compare.mjs` writes on its first
+      # line and edited in place. A fork's token cannot write; the summary still has the table.
+      - name: comment on the pull request
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          [ -f bench.md ] || { echo "no table to post"; exit 0; }
+          id="$(gh api --paginate "repos/$REPO/issues/$PR/comments" --jq '.[] | select(.body | startswith("<!-- anydag-bench -->")) | .id' | head -n 1)"
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$id" -F body=@bench.md > /dev/null
+          else
+            gh api --method POST "repos/$REPO/issues/$PR/comments" -F body=@bench.md > /dev/null
+          fi

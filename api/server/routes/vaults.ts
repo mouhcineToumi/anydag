@@ -16,29 +16,14 @@
 
 import { Hono } from "hono";
 
-import type { AccountInfo, KdfParams, PutVaultKey, RemoteVault, VaultsResponse } from "../../protocol/wire";
+import { CreateVault, PutVaultKey, Report } from "../../protocol/schema";
+import type { AccountInfo, RemoteVault, VaultsResponse } from "../../protocol/wire";
 import type { VaultRow } from "../meta/types";
-import { body, count, HttpError, isObject, str, type Deps, type Vars } from "./http";
+import { HttpError, read, type Deps, type Vars } from "./http";
 import { live } from "./pair";
-
-const SEALED_MAX = 64 * 1024;
 
 function wireVault(v: VaultRow): RemoteVault {
   return { id: v.id, name: v.name, seq: Number(v.seq), created: v.created, keyed: v.keyed };
-}
-
-function params(v: unknown): KdfParams {
-  if (!isObject(v)) throw new HttpError("ES_BAD_REQUEST", "params must be an object");
-  const salt = str(v.salt, "params.salt", 1024);
-  const n = (k: string): number => {
-    const x = v[k];
-    if (typeof x !== "number" || !Number.isSafeInteger(x) || x < 1)
-      throw new HttpError("ES_BAD_REQUEST", `params.${k} must be a whole number of at least 1`);
-    return x;
-  };
-  if (v.kdf === "argon2id") return { kdf: "argon2id", m: n("m"), t: n("t"), p: n("p"), salt };
-  if (v.kdf === "scrypt") return { kdf: "scrypt", N: n("N"), r: n("r"), p: n("p"), salt };
-  throw new HttpError("ES_BAD_REQUEST", "params.kdf must be argon2id or scrypt");
 }
 
 export function vaultRoutes(deps: Deps): Hono<{ Variables: Vars }> {
@@ -50,14 +35,7 @@ export function vaultRoutes(deps: Deps): Hono<{ Variables: Vars }> {
   });
 
   app.post("/v1/vaults", async (c) => {
-    const b = await body(c);
-    const name = str(b.name, "name", SEALED_MAX);
-    let id: string | undefined;
-    if (b.id !== undefined && b.id !== null) {
-      id = str(b.id, "id", 10, 10);
-      if (!/^[0-9a-z]{10}$/.test(id))
-        throw new HttpError("ES_BAD_REQUEST", "id must be ten characters of lower-case Crockford base32");
-    }
+    const { name, id } = await read(c, CreateVault);
     const row = await deps.meta.createVault(c.get("device").account, name, id);
     return c.json(wireVault(row) satisfies RemoteVault, 201);
   });
@@ -69,13 +47,7 @@ export function vaultRoutes(deps: Deps): Hono<{ Variables: Vars }> {
   });
 
   app.put("/v1/vaults/:v/key", async (c) => {
-    const b = await body(c);
-    const put: PutVaultKey = {
-      wrapped: str(b.wrapped, "wrapped", SEALED_MAX),
-      recovery: str(b.recovery, "recovery", SEALED_MAX),
-      params: params(b.params),
-    };
-    if (b.etag !== undefined && b.etag !== null) put.etag = str(b.etag, "etag", 200);
+    const put = await read(c, PutVaultKey);
     const key = await deps.meta.putKey(c.get("vault").id, put);
     if (!key)
       throw new HttpError(
@@ -88,9 +60,7 @@ export function vaultRoutes(deps: Deps): Hono<{ Variables: Vars }> {
   });
 
   app.post("/v1/vaults/:v/report", async (c) => {
-    const b = await body(c);
-    const copied = count(b.copied ?? 0, "copied");
-    const merged = count(b.merged ?? 0, "merged");
+    const { copied, merged } = await read(c, Report);
     const v = c.get("vault");
     if (copied) await deps.usage.bump(v.account, v.id, "conflicts_copied", copied);
     if (merged) await deps.usage.bump(v.account, v.id, "merged", merged);

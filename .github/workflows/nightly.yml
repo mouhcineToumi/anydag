@@ -8,20 +8,22 @@
 #      own branch, and nothing here ever deletes one.** `develop` itself is never touched.
 #   2. **checks, e2e, desktop** — everything, against that tag: the fast tier and the api server's
 #      suites, the full Playwright run (`e2e.yml`), and the desktop app on all three systems.
-#      Beside them, **bench**: the two resource guards (`scripts/bench.mjs --guard`), which hold
-#      nothing back.
+#      Beside them, **bench**: the two resource guards (`scripts/bench.mjs --guard`), and the whole
+#      bench with its JSON kept as an artifact (`bench, full`), which hold nothing back.
 #   3. **publish** — a pre-release with every installer and the nightly update files
 #      (`nightly.yml`, `nightly-linux.yml`, `nightly-mac.yml`), and only if every one is there.
 #
 # Beside them, every night whether or not there is a build: **secrets**, gitleaks over the whole
-# history of `develop` (`scripts/secrets.sh all`).
+# history of `develop` (`scripts/secrets.sh all`), and **waste**, the whole tree's duplicated blocks
+# and over-complex functions (#526) with their totals and worst entries in the run summary.
 #
 # **Why this publishes itself.** A push made with `GITHUB_TOKEN` starts no other workflow, so the tag
 # below does not start `release.yml` — which would refuse it anyway, because a nightly is not a release.
 #
 # **Who gets it.** The update channel is the version's own word (`nightly`): a build installed from
 # one asks for `nightly*.yml` and follows nightlies, and a stable or beta build never sees a nightly,
-# because a pre-release is not GitHub's "latest" and a beta only follows `beta`. `desktop/main.ts` says how.
+# because a pre-release is not GitHub's "latest" and a beta only follows `beta` — unless its person
+# chose *Nightly* in Settings → About (#525). `desktop/main.ts` says how.
 #
 # `e2e.yml` runs at this workflow's own commit, `develop`'s head — the stamped commit's parent, and the
 # same code but for three version lines.
@@ -132,6 +134,28 @@ jobs:
       - run: bash scripts/secrets.sh selftest
       - run: bash scripts/secrets.sh all
 
+  # The two wastes of agent-written code, over the whole tree (#526): duplicated blocks (jscpd) and
+  # functions over the cognitive-complexity threshold, each with its totals and worst entries in the
+  # run summary. Like `secrets`, it runs every night whether or not there is a build, and it holds
+  # nothing back — the follow-up issues come from its list, and the numbers can only go down.
+  waste:
+    name: duplication and complexity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run report:duplication
+      - run: npm run report:complexity
+
   checks:
     name: checks
     needs: prepare
@@ -153,6 +177,73 @@ jobs:
       contents: read
     with:
       scope: full
+
+  # The tests that passed only on retry (#494). The suite retries a failed test once, so a flake leaves
+  # the run green and is said once, in a report nobody reads; this keeps one issue per flaky test —
+  # opened the first night it shows, commented on every night after — so a flake is a thing on the
+  # board rather than a re-run somebody pressed and forgot. It reads the full suite's shards, whatever
+  # `e2e` concluded: a red night still says which of its other tests needed a second try. It holds
+  # nothing back, and a failure here (GitHub not answering) is its own red, not the build's.
+  flaky:
+    name: flaky tests
+    needs: [prepare, e2e]
+    if: ${{ !cancelled() && needs.prepare.outputs.build == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          sparse-checkout: scripts/flaky.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          path: blobs
+          pattern: blob-report-full-*
+          merge-multiple: true
+      - name: Keep an issue per test that passed only on retry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ ! -d blobs ]; then echo "::warning::no shard left a report, so there is nothing to read"; exit 0; fi
+          PLAYWRIGHT_JSON_OUTPUT_NAME=report.json npx --yes -p @playwright/test@1.65.0 playwright merge-reports --reporter=json ./blobs > /dev/null
+          node scripts/flaky.mjs report.json > flaky.jsonl
+          count=$(wc -l < flaky.jsonl | tr -d ' ')
+          {
+            echo "## Tests that passed only on retry: $count"
+            jq -r '"- `\(.file):\(.line)` \(.name | split(" › ")[1:] | join(" › "))"' flaky.jsonl
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$count" = 0 ] && { echo "no test needed a second try"; exit 0; }
+          # The labels say where it goes: triage, so a person decides; never `status: ready` from here.
+          while IFS= read -r line; do
+            title=$(jq -r .title <<<"$line")
+            body=$(jq -r --arg v "$VERSION" --arg run "$RUN_URL" '
+              "`\(.file):\(.line)` failed, then passed on its retry, in the full browser suite of nightly `\($v)` ([run](\($run))).\n\n" +
+              "```\n\(.error)\n```"' <<<"$line")
+            # The open issue with exactly this title, if there is one: a search matches words, so the title is compared whole.
+            number=$(gh issue list --state open --label "area: ci" --search "in:title \"$(jq -r .file <<<"$line")\"" --limit 100 \
+              --json number,title | jq -r --arg t "$title" 'map(select(.title == $t)) | .[0].number // empty')
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body "Again, in nightly \`$VERSION\` ([run]($RUN_URL))."
+              echo "flaky again: #$number $title"
+            else
+              gh issue create --title "$title" --label "status: triage" --label "type: bug" --label "area: ci" --body "$body
+
+          Opened by the nightly's *flaky tests* job (#494). It comments here each night the test needs a second try again; close this when it is fixed."
+              echo "flaky, new issue: $title"
+            fi
+          done < flaky.jsonl
 
   desktop:
     name: desktop
@@ -200,6 +291,43 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npx vite build && node server/build.mjs
       - run: node scripts/bench.mjs --guard
+
+  # The whole bench (#527): every group at every vault size, `edit.*` included, with its JSON and its
+  # printed lines kept for ninety days as `bench-<version>`, so the numbers can be plotted night over
+  # night. A runner's numbers are not a laptop's and move with the host, so this is a record and not a
+  # guard: nothing here fails on a number, and `publish` does not wait for it. The `desktop` group
+  # records that it was skipped — there is no display, and no Electron, in the image.
+  bench-full:
+    name: bench, full
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+      options: --ipc=host
+    defaults:
+      run:
+        shell: bash
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx vite build && node server/build.mjs
+      - run: node scripts/bench.mjs --json bench.json 2>&1 | tee bench.txt
+      # Kept when the run fails too: `--json` is written with whatever was measured before it stopped.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: bench-${{ needs.prepare.outputs.version }}
+          path: |
+            bench.json
+            bench.txt
+          retention-days: 90
+          if-no-files-found: ignore
 
   publish:
     name: publish

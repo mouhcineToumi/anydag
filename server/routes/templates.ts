@@ -18,7 +18,8 @@ import { taskOf } from "../../src/note/task";
 import { TEMPLATES_DEFAULT, fillTemplate, inTemplates } from "../../src/note/template";
 import type { Session } from "../context";
 import { withTitle } from "../frontmatter";
-import { bodyOf, err, mustRead } from "../http";
+import { bodyAs, err, mustRead } from "../http";
+import { FromTemplateBody } from "../schema/vaults";
 import { withId } from "../ids";
 import { leafOf } from "../names";
 import { Refused } from "../vault";
@@ -61,7 +62,7 @@ export function templateRoutes(app: Hono, s: Session): void {
   });
 
   app.post("/__board/from-template", async (c) => {
-    const body = await bodyOf(c);
+    const body = await bodyAs(c, FromTemplateBody);
     const template = str(body.template).trim();
     const folder = s.vault.templatesFolder();
     if (!template || !inTemplates(template, folder)) throw err(404, `no template \`${template}\``);

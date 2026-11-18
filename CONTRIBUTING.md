@@ -93,7 +93,8 @@ or the maintainer may label the PR `no-issue` instead.
 
 Labels, in case you want to filter: `status: …`, `type: bug|feature|docs|chore`, `area: …` (canvas,
 dsl, notes, tables, quizzes, tasks-calendar, sync, desktop, cli-mcp, assistant, ci),
-`size: S|M|L` and `agent: light|standard|deep` (see *Agent tier* below). The definitions are in
+`size: S|M|L`, `agent: light|standard|deep` (see *Agent tier* below), and the bug qualifiers
+`escaped` (present in a stable release) and `regression` (used to work). The definitions are in
 [`.github/labels.yml`](.github/labels.yml).
 
 ## Definition of Ready (for an issue)
@@ -105,7 +106,8 @@ they are finished. It has:
 - [ ] **The expected behaviour**, in a sentence or two.
 - [ ] **For a bug:** steps to reproduce, what happened instead, the AnyDag **version** (Settings →
       About), and your **OS** — plus whether it is the desktop app or `anydag serve`, and a board,
-      note or screenshot if that shows it.
+      note or screenshot if that shows it. At triage the maintainer adds `escaped` when the version is
+      a stable release, and `regression` when the report says it worked before.
 - [ ] **For a feature:** the **scope**, and explicitly **what is out of scope**, so a PR knows where
       to stop.
 - [ ] **Acceptance criteria** — a short checklist a reviewer can tick.
@@ -257,9 +259,11 @@ release note, so write it for someone reading a changelog.
 
 **Review**
 
-- **Every PR from someone other than the maintainer needs the maintainer's approval** (it is the
-  code owner of everything, see [`.github/CODEOWNERS`](.github/CODEOWNERS)); the maintainer can also
-  merge their own PRs without one.
+- **Only the maintainer can merge**, so every PR from someone else is merged after the
+  maintainer has reviewed it (the code owner of everything, see [`.github/CODEOWNERS`](.github/CODEOWNERS)).
+  The maintainer's own PRs, and an outside one once reviewed, go through the **merge queue**:
+  labelled `queue`, each is brought up to date with `develop` in turn and lands when the required
+  checks pass on it, with no approval to wait for.
 - The maintainer reviews in their own time. If you have heard nothing for a while, a polite nudge on the
   PR is welcome.
 - Review is about the code, never the person. Feedback is concrete and may ask for a smaller PR, a

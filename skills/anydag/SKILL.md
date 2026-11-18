@@ -136,6 +136,12 @@ never sends your text over theirs), `4` the file has errors, `5` the page never 
 server, `7` no vault. Read `--help` before guessing a flag; text comes from `--file`, and stdin only
 as `--file -`.
 
+**A script that calls the server's HTTP API** — what MCP and the CLI call underneath — reads the
+local server's OpenAPI 3.1 document rather than guessing a route: `GET /api/openapi.json` on a running
+server (with the `X-AnyDag-Token` header, like every route), or `docs/api/local.openapi.json` and its
+reference `docs/api/local.md` in the repository. It lists every route, its body, and every answer
+with its status — refusals included, and the `409` that hands back the text that won and its `base`.
+
 ### Through the files
 
 ```bash

@@ -5,9 +5,9 @@
  * `app.request(…)`, and `main.ts` over a real Postgres and a socket, with no difference between.
  *
  * Load-bearing:
- * - **Who may ask is decided by path, in one place**: `/v1`, `/v1/health`, `/v1/ready`, `/v1/logs`
- *   and `/v1/feedback` answer without a token of any kind; `/v1/pair` takes its code as its
- *   credential; `/v1/admin/*` and `/metrics` the admin token; every other `/v1/*` a device token, and
+ * - **Who may ask is decided by path, in one place**: `/v1`, `/v1/health`, `/v1/ready`,
+ *   `/v1/openapi.json`, `/v1/logs` and `/v1/feedback` answer without a token of any kind;
+ *   `/v1/pair` takes its code as its credential; `/v1/admin/*` and `/metrics` the admin token; every other `/v1/*` a device token, and
  *   `/v1/vaults/{v}/*` also a vault of that device's account. A route added under `/v1/` is behind
  *   a device token by default; forgetting is never a hole.
  * - **A feature that is `off` does not exist**: with `ANYDAG_API_SYNC=off` every sync route —
@@ -21,9 +21,9 @@
  * - **Every `/v1` answer says the protocol, and a device's request must say the same one**
  *   (`PROTOCOL_HEADER`), checked before who is asking: a client of another protocol — a 0.2.0 one
  *   sends none — is refused `ES_PROTOCOL`, never served a `meta` it would misread or let commit
- *   one this server's devices would refuse. `/v1`, `/v1/health`, `/v1/ready`, `/v1/logs`,
- *   `/v1/feedback`, the poke stream and `/v1/admin/*` carry nothing whose shape moved, and are not
- *   checked.
+ *   one this server's devices would refuse. `/v1`, `/v1/health`, `/v1/ready`, `/v1/openapi.json`,
+ *   `/v1/logs`, `/v1/feedback`, the poke stream and `/v1/admin/*` carry nothing whose shape moved,
+ *   and are not checked.
  * - **Latency is recorded by route template**, never by path (`metrics.ts`): `routePath(c, -1)`
  *   after the handler ran is the template that answered, and a request no route matched is
  *   `unmatched`.
@@ -69,8 +69,8 @@ export interface AppOptions {
 }
 
 /** Routes any protocol may call: `/v1` and health say the protocol, a readiness probe sends none,
-    and the rest carry nothing it changed. */
-const ANY_PROTOCOL = new Set(["/v1", "/v1/health", "/v1/ready", "/v1/logs", "/v1/feedback"]);
+    the document is how a client finds out what a server speaks, and the rest carry nothing it changed. */
+const ANY_PROTOCOL = new Set(["/v1", "/v1/health", "/v1/ready", "/v1/openapi.json", "/v1/logs", "/v1/feedback"]);
 const anyProtocol = (p: string): boolean =>
   ANY_PROTOCOL.has(p) || p.startsWith("/v1/admin/") || /^\/v1\/vaults\/[^/]+\/poke$/.test(p);
 
@@ -119,10 +119,10 @@ export function createApp(opts: AppOptions): Hono<{ Variables: Vars }> & { deps:
   });
 
   const asDevice = device(deps);
-  /* Routes that answer whatever the switches say: /v1 itself, the two checks — and /v1/logs and
-     /v1/feedback, which are features of their own (`ANYDAG_API_LOGS=off` and
+  /* Routes that answer whatever the switches say: /v1 itself, the two checks, the document — and
+     /v1/logs and /v1/feedback, which are features of their own (`ANYDAG_API_LOGS=off` and
      `ANYDAG_API_FEEDBACK=off` are their own 404s, and sync's switch is not their business). */
-  const always = new Set(["/v1/health", "/v1/ready", "/v1/logs", "/v1/feedback"]);
+  const always = new Set(["/v1/health", "/v1/ready", "/v1/openapi.json", "/v1/logs", "/v1/feedback"]);
   app.use("/v1/*", async (c, next) => {
     const p = c.req.path;
     if (p === "/v1" || always.has(p)) return next();

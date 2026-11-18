@@ -16,6 +16,8 @@
 #      made unless all of them are there. A beta is a pre-release; a stable release is the "latest"
 #      one, the only kind a stable build is ever offered. The notes are generated from the merged pull
 #      requests by their labels (`.github/release.yml`); edit them on GitHub afterwards.
+#   4. A stable release also carries the development health report (#529): the JSON and the MD are
+#      attached to the release, and the back-merge into develop commits them (`docs/metrics/README.md`).
 #      **No `anydag-api` release asset**: the api server is #99's, and until the `cloud` switch is
 #      on (#103) a release publishes no server binary or image, and its notes link none. It runs
 #      from a checkout (`api/dist/`, `deploy/`), and CI keeps running its suites.
@@ -130,6 +132,9 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+      # The development health report counts the open Dependabot alerts; without this the row says
+      # n/a with the token's reason rather than inventing a zero.
+      security-events: read
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ github.ref_name }}
@@ -169,3 +174,9 @@ jobs:
             --generate-notes "${notes[@]}" \
             --verify-tag \
             "${flags[@]}"
+      - name: The development health report
+        if: needs.verify.outputs.kind == 'stable'
+        run: |
+          # The window is fixed by the tags, so this is the same JSON a local run writes; the
+          # back-merge downloads it from this release instead of regenerating it (RELEASING.md).
+          node scripts/release-report.mjs "${TAG#v}" --attach

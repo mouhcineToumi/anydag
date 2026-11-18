@@ -8,7 +8,7 @@
  * written but the built bundles, and the folder is removed by its exact path when the run ends.
  *
  *   node scripts/bench.mjs [--quick] [--guard] [--release] [--save] [--sizes 100,1000,10000,50000]
- *                          [--only <groups>] [--json <file>] [--keep]
+ *                          [--only <groups>] [--json <file>] [--app <checkout>] [--keep]
  *
  *   --quick   small steps only (vaults of 100 and 1k files, boards of 10 and 100 items, diagrams of
  *             50 and 200 nodes, attachments of 1 and 10 MB, graphs of 500 and 2k files): a few
@@ -21,9 +21,13 @@
  *   --save    with --release, also write this run to `docs/bench/<VERSION>.json`, the file the next
  *             release is compared with; refuses a row the run could not measure
  *   --sizes   the vault sizes, in files (default 100,1000,10000,50000)
- *   --only    a comma list of groups: vault, page, board, attach, leak, desktop, graph (default all;
- *             with --release, the four groups its rows come from)
- *   --json    also write every measurement, with the machine, to this file
+ *   --only    a comma list of groups: vault, page, board, edit, attach, leak, desktop, graph,
+ *             graph-page (default all; with --release, the four groups its rows come from)
+ *   --json    also write every measurement, with the machine, to this file — whatever was measured,
+ *             when the run stops early too
+ *   --app     measure the build in another checkout (its `server/dist/` and `dist/`) rather than
+ *             this one's; `scripts/bench-compare.mjs` measures a pull request's base and head so,
+ *             both with the head's bench
  *   --keep    leave the temp folder in place and say where it is
  *
  * Needs the built page and server (`npm run build && node server/build.mjs`), except `--only graph`,
@@ -69,6 +73,15 @@
  *   (median and max; `data-dag-ready` already waits for the fonts and the re-layout they cause), the
  *   heap and DOM of each board, and its idle CPU on a fresh page loaded once (a tab reloaded three
  *   times spends the next tens of seconds in GC of the old documents, which is not the board's).
+ * - *edit.<n>*: what a person waits on while editing (#527), in the built page on a vault of n files
+ *   (the `vault` group's, at every `--sizes`) with a small board and a note of its own: a new note,
+ *   task, board and table from the sidebar's New; the last key typed into a note to its save written
+ *   (the 250 ms debounce included); a card retyped where it is drawn, a text card dragged, two cards
+ *   connected and that connect undone; and a note renamed, moved into a folder and deleted from its
+ *   sidebar row. Each is timed from the input — a raw click, key or pointer release — to the moment
+ *   the page shows it, the file on disk holds it, and every write the page sent for it has been
+ *   answered; once unrecorded, then five times, and the line is the median. Its note gives the
+ *   spread and, as medians, when each of the three came: which one is the time.
  * - *attach.*: attachments of 1, 10, 100 and 500 MB uploaded and read back, with the server's peak
  *   RSS after each, and one over the 512 MB limit.
  * - *leak.*: the server's RSS across 30 rounds of list, index and search, and across 100 change-feed
@@ -121,13 +134,16 @@ const require = createRequire(import.meta.url);
 const { chromium, _electron } = require("@playwright/test");
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SERVER = path.join(root, "server", "dist", "anydag-server.mjs");
-const PAGE = path.join(root, "dist", "index.html");
-const DESKTOP = path.join(root, "desktop", "dist", "main.cjs");
+const argv = process.argv.slice(2);
+/* The app measured: this checkout's build, or another's with `--app` (the pull request's bench
+   measures its base and its head with one script). The server finds the page beside itself. */
+const APP = path.resolve(argv.includes("--app") ? argv[argv.indexOf("--app") + 1] : root);
+const SERVER = path.join(APP, "server", "dist", "anydag-server.mjs");
+const PAGE = path.join(APP, "dist", "index.html");
+const DESKTOP = path.join(APP, "desktop", "dist", "main.cjs");
 
 /* -- arguments ------------------------------------------------------------------------------- */
 
-const argv = process.argv.slice(2);
 if (argv.includes("--help") || argv.includes("-h")) {
   console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("*/")[0]);
   process.exit(0);
@@ -162,7 +178,7 @@ const SIZES = opt("--sizes", QUICK ? "100,1000" : "100,1000,10000,50000")
    leaves either out gets it back, so the table always has the same ten rows to show. */
 if (RELEASE && !SIZES.includes(1000)) SIZES.push(1000);
 const ONLY = new Set(
-  (RELEASE ? "vault,page,board,desktop" : opt("--only", "vault,page,board,attach,leak,desktop,graph,graph-page")).split(","),
+  (RELEASE ? "vault,page,board,desktop" : opt("--only", "vault,page,board,edit,attach,leak,desktop,graph,graph-page")).split(","),
 );
 const BOARD_ITEMS = QUICK ? [10, 100] : [10, 100, 500, 2000];
 if (RELEASE && !BOARD_ITEMS.includes(500)) BOARD_ITEMS.push(500);
@@ -178,7 +194,7 @@ for (const [file, what] of [
   [PAGE, "npm run build"],
 ]) {
   if (NEEDS_BUILD && !fs.existsSync(file)) {
-    console.error(`bench: ${path.relative(root, file)} is missing — run \`${what}\` first`);
+    console.error(`bench: ${path.relative(root, file) || file} is missing — run \`${what}\` first`);
     process.exit(2);
   }
 }
@@ -1697,6 +1713,483 @@ async function desktopGroup() {
   await desktopStartup();
 }
 
+/* -- editing ---------------------------------------------------------------------------------------- */
+
+/** How many times each edit is timed at one vault size; the median is the number, after one unrecorded. */
+const EDIT_ROUNDS = 5;
+
+/**
+ * The board every `edit.<n>.card.*` acts on: one `arch` diagram whose cards are retyped, joined and
+ * unjoined, and a dozen text cards beside it, one of which is dragged. Small on purpose: what grows
+ * here is the vault around it, and a board's own size is the `board.*` group's question.
+ */
+const EDIT_BOARD = [
+  "---",
+  "title: Bench",
+  "---",
+  "",
+  '```arch {#infra x=0 y=0 title="Infra"}',
+  'service n0 "Gateway"',
+  'service n1 "Orders"',
+  'store n2 "Ledger"',
+  'queue n3 "Events"',
+  'service n4 "Billing"',
+  'store n5 "Archive"',
+  "n0 --> n1",
+  "n1 --> n2",
+  "n1 --> n3",
+  "n3 --> n4",
+  "```",
+  "",
+  ...Array.from({ length: 12 }, (_, i) => [
+    `\`\`\`md {#c${i} x=${960 + (i % 3) * 400} y=${Math.floor(i / 3) * 280} w=320}`,
+    `### Card ${i}`,
+    "",
+    `${paragraph(rng(100 + i), 24)}`,
+    "```",
+    "",
+  ]).flat(),
+].join("\n");
+
+const EDIT_NOTE = (r) => noteText(r, 300, "title: Bench note\n", []).replace(/\n$/, "\n\nThe last paragraph.\n");
+
+/**
+ * What a person waits on while editing, in the built page on a vault of `n` files (#527): each action
+ * timed from the input — the click, the key, the pointer let go — to the moment it is both **visible**
+ * (the page shows it) and **written** (the file on disk holds it, and every write the page sent for it
+ * has been answered). Each is done once unrecorded, which pays for its chunks and its first layout,
+ * and then `EDIT_ROUNDS` times; the line is the median, and the note says the spread.
+ */
+async function editGroup(n, b) {
+  const p = `edit.${n}`;
+  const dir = path.join(work, `vault-edit-${n}`);
+  const t = now();
+  makeVault(dir, n, 17);
+  fs.writeFileSync(path.join(dir, "Bench.board.md"), EDIT_BOARD);
+  fs.writeFileSync(path.join(dir, "Bench note.md"), EDIT_NOTE(rng(17)));
+  /* One note per round for each of rename, move and delete, and one for its warm-up: each is used up. */
+  for (let i = 0; i <= EDIT_ROUNDS; i++)
+    for (const what of ["rename", "move", "delete"])
+      fs.writeFileSync(path.join(dir, `bench-${what}-${i}.md`), noteText(rng(200 + i), 120, `title: Bench ${what} ${i}\n`, []));
+  console.log(`# edit.${n}: vault generated in ${Math.round(now() - t)} ms`);
+  const s = await startServer(dir, path.join(work, `home-edit-${n}`));
+  const { context, page, problems } = await pageOn(b, s);
+  const file = (rel) => path.join(dir, rel);
+  const read = (rel) => {
+    try {
+      return fs.readFileSync(file(rel), "utf8");
+    } catch {
+      return null;
+    }
+  };
+
+  /* The page's writes: every POST to the server's routes, from sent to answered. */
+  const inflight = new Set();
+  let answered = 0;
+  let lastAnswer = 0;
+  page.on("request", (r) => {
+    if (r.method() === "POST" && new URL(r.url()).pathname.includes("/__board/")) inflight.add(r);
+  });
+  const settle = (r) => {
+    if (!inflight.delete(r)) return;
+    answered++;
+    lastAnswer = now();
+  };
+  page.on("requestfinished", settle);
+  page.on("requestfailed", settle);
+
+  /**
+   * Time one action. `prepare` runs first, untimed: everything up to the input. `act(go)` makes the
+   * input, calling `go()` just before it, which is the clock's start. The action is over when `file`
+   * (a test of the disk) holds, `dom` (a test run in the page, given `domArg`) holds, and every write
+   * the page sent since has been answered — the latest of the three, each kept to say where the time
+   * went. `writes: false` for an action that sends none.
+   */
+  const timeOne = async ({ prepare, act, file: onDisk, dom, domArg, writes = true }) => {
+    if (prepare) await prepare();
+    const before = answered;
+    let t0 = 0;
+    await act(() => {
+      t0 = now();
+    });
+    const limit = now() + 60_000;
+    const diskAt = (async () => {
+      if (!onDisk) return t0;
+      while (now() < limit) {
+        if (onDisk()) return now();
+        await sleep(4);
+      }
+      return null;
+    })();
+    const domAt = (async () => {
+      if (!dom) return t0;
+      try {
+        await page.waitForFunction(dom, typeof domArg === "function" ? domArg() : domArg, { timeout: 60_000, polling: "raf" });
+        return now();
+      } catch {
+        return null;
+      }
+    })();
+    const [d1, d2] = await Promise.all([diskAt, domAt]);
+    if (d1 === null || d2 === null) return { ms: "timeout", why: d1 === null ? "the file" : "the page" };
+    let w = t0;
+    if (writes) {
+      while (now() < limit && (inflight.size > 0 || answered === before)) await sleep(4);
+      if (inflight.size > 0 || answered === before) return { ms: "timeout", why: "a write" };
+      w = lastAnswer;
+    }
+    return { ms: Math.max(d1, d2, w) - t0, parts: { file: d1 - t0, page: d2 - t0, answered: w - t0 } };
+  };
+
+  /**
+   * Rounds of one or more actions done in turn — a connect and then its undo — each timed: one round
+   * unrecorded, then `EDIT_ROUNDS`, and each metric's median recorded. `make(i)` gives round i's
+   * actions, in the order of `metrics`.
+   */
+  const series = async (metrics, make) => {
+    const xs = metrics.map(() => []);
+    const parts = metrics.map(() => []);
+    const why = metrics.map(() => "");
+    for (let i = 0; i <= EDIT_ROUNDS; i++) {
+      const steps = make(i);
+      let failed = false;
+      for (let k = 0; k < steps.length; k++) {
+        let r;
+        try {
+          r = await timeOne(steps[k]);
+        } catch (e) {
+          r = {
+            ms: "timeout",
+            why: String(e?.message ?? e)
+              .split("\n")[0]
+              .slice(0, 100),
+          };
+        }
+        if (r.ms === "timeout") {
+          why[k] = r.why;
+          failed = true;
+          break;
+        }
+        if (i > 0) {
+          xs[k].push(r.ms);
+          parts[k].push(r.parts);
+        }
+      }
+      if (failed) break;
+    }
+    metrics.forEach(([metric, note], k) => {
+      if (xs[k].length < EDIT_ROUNDS)
+        return record(`${p}.${metric}`, "timeout", "ms", `${note}; waiting on ${why[k] || "an earlier step"}`);
+      /* Which of the three came last, as medians: where the time went. */
+      const part = (key) => Math.round(median(parts[k].map((x) => x[key])));
+      record(
+        `${p}.${metric}`,
+        median(xs[k]),
+        "ms",
+        `${note}; median of ${xs[k].length}, ${Math.round(Math.min(...xs[k]))}–${Math.round(Math.max(...xs[k]))}; file ${part("file")}, page ${part("page")}, answered ${part("answered")}`,
+      );
+    });
+  };
+
+  const open = async (query) => {
+    const r = await readyAfter(page, `${s.origin}/?${query}`);
+    if (r === "timeout") throw new Error(`?${query} did not reach data-dag-ready`);
+  };
+  const sidebar = async () => {
+    for (let k = 0; k < 20; k++) {
+      if (await page.locator('[data-dag-sidebar][data-mode="docked"]').isVisible()) return;
+      await page
+        .locator("[data-dag-sidebar-toggle]")
+        .click({ timeout: 2_000 })
+        .catch(() => undefined);
+      await sleep(250);
+    }
+    throw new Error("the sidebar would not dock");
+  };
+  /** The `⋯` on the open file's row in the sidebar, and one item of its menu. */
+  const rowMenu = async (where, item) => {
+    const row = page.locator(`[data-dag-sidebar-file="${where}"]`);
+    await row.waitFor({ timeout: 15_000 });
+    for (let k = 0; k < 20; k++) {
+      try {
+        await row.scrollIntoViewIfNeeded({ timeout: 1_000 });
+        const box = await row.boundingBox();
+        if (!box) throw new Error("no row");
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.locator(`[data-dag-sidebar-more="${where}"]`).click({ timeout: 1_000 });
+        await page.locator(`[data-dag-sidebar-menu-item="${item}"]`).waitFor({ timeout: 1_000 });
+        return page.locator(`[data-dag-sidebar-menu-item="${item}"]`);
+      } catch {
+        await page.keyboard.press("Escape");
+        await sleep(200);
+      }
+    }
+    throw new Error(`no ${item} in the menu of ${where}`);
+  };
+  const centre = async (selector) => {
+    const box = await page.locator(selector).boundingBox();
+    if (!box) throw new Error(`nothing at ${selector}`);
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  /** Click, pause, click: the second press picks the card out of its diagram (a quick pair is a double-click). */
+  const pick = async (selector) => {
+    await page.locator(selector).click();
+    await sleep(400);
+    await page.locator(selector).click();
+    await page.locator(`${selector}[data-dag-picked]`).waitFor({ timeout: 5_000 });
+  };
+
+  try {
+    await open("board=Bench");
+    await sidebar();
+
+    /* -- the board ---------------------------------------------------------------------------- */
+    const bench = () => read("Bench.board.md") ?? "";
+    await series([["card.retype", "a card's name retyped where it is drawn: Enter to the file and the drawing"]], (i) => {
+      const name = `Gateway ${i}`;
+      return [
+        {
+          prepare: async () => {
+            await page.keyboard.press("Escape");
+            await page.locator('[data-dag-node="n0"]').dblclick();
+            await page.locator("[data-dag-rename-box]").fill(name);
+          },
+          act: async (go) => {
+            go();
+            await page.locator("[data-dag-rename-box]").press("Enter");
+          },
+          file: () => bench().includes(`service n0 "${name}"`),
+          dom: (want) => document.querySelector('[data-dag-node="n0"]')?.textContent?.includes(want),
+          domArg: name,
+        },
+      ];
+    });
+
+    const pinned = () => /```md \{#c0[^}]*\}/.exec(bench())?.[0] ?? "";
+    await series([["card.move", "a text card dragged 96 px: the pointer let go to the file"]], (i) => {
+      const dx = i % 2 ? -96 : 96;
+      let was = "";
+      return [
+        {
+          prepare: async () => {
+            await page.keyboard.press("Escape");
+            was = pinned();
+            const from = await centre('[data-dag-item="c0"]');
+            await page.mouse.move(from.x, from.y - 20);
+            await page.mouse.down();
+            await page.mouse.move(from.x + dx / 2, from.y - 20 + dx / 4, { steps: 6 });
+            await page.mouse.move(from.x + dx, from.y - 20 + dx / 2, { steps: 6 });
+          },
+          act: async (go) => {
+            go();
+            await page.mouse.up();
+          },
+          file: () => pinned() !== was,
+        },
+      ];
+    });
+
+    /* A connect and then its undo, in turn: each round puts the same edge in and takes it out. */
+    const joined = () => (bench().split("{#infra")[1]?.split("```")[0] ?? "").includes("n0 --> n5");
+    const lines = '[data-dag-item="infra"] .dag-edge-hit';
+    let drawn = 0;
+    await series(
+      [
+        ["card.connect", "a card's handle pulled onto another in its diagram: let go to the edge written and drawn"],
+        ["undo", "ctrl+Z on that connect: the key to the edge gone from the file and the drawing"],
+      ],
+      () => [
+        {
+          prepare: async () => {
+            await page.keyboard.press("Escape");
+            if (joined()) throw new Error("the edge was already there");
+            drawn = await page.locator(lines).count();
+            await pick('[data-dag-node="n0"]');
+            const handle = await centre('.dag-nodetools [data-dag-connect="s"]');
+            const target = await centre('[data-dag-node="n5"]');
+            await page.mouse.move(handle.x, handle.y);
+            await page.mouse.down();
+            await page.mouse.move(target.x, target.y, { steps: 12 });
+          },
+          act: async (go) => {
+            go();
+            await page.mouse.up();
+          },
+          file: joined,
+          dom: ([sel, was]) => document.querySelectorAll(sel).length > was,
+          domArg: () => [lines, drawn],
+        },
+        {
+          prepare: async () => {
+            await page.keyboard.press("Escape");
+            await page.locator("[data-dag-undo]:not([disabled])").waitFor({ timeout: 10_000 });
+            drawn = await page.locator(lines).count();
+            await page.locator(".dag-viewport").focus();
+          },
+          act: async (go) => {
+            go();
+            await page.keyboard.press("Control+z");
+          },
+          file: () => !joined(),
+          dom: ([sel, was]) => document.querySelectorAll(sel).length < was,
+          domArg: () => [lines, drawn],
+        },
+      ],
+    );
+
+    /* -- a note ------------------------------------------------------------------------------- */
+    await open("note=Bench%20note");
+    await series(
+      [["note.save", "typing at the end of a note: the last key to the save written (a 250 ms debounce included)"]],
+      (i) => {
+        const word = ` bench${i}word`;
+        return [
+          {
+            prepare: async () => {
+              await page.locator(".bn-editor .bn-block-content", { hasText: "The last paragraph." }).first().click();
+              await page.keyboard.press("End");
+              await page.keyboard.type(word.slice(0, -1));
+            },
+            act: async (go) => {
+              go();
+              await page.keyboard.press(word.slice(-1));
+            },
+            file: () => read("Bench note.md")?.includes(word),
+          },
+        ];
+      },
+    );
+
+    /* -- new files ---------------------------------------------------------------------------- */
+    /* What says each new file is open and ready for its name: the note's title holding the caret, the
+       empty board's card of ways in, the table's grid. */
+    const KINDS = [
+      ["note", "note", /^Untitled( \d+)?\.md$/, "[data-dag-note-title]:focus"],
+      ["task", "note", /^Untitled( \d+)?\.md$/, "[data-dag-note-title]:focus"],
+      ["board", "board", /^Untitled( \d+)?\.board\.md$/, "[data-dag-empty-board]"],
+      ["table", "table", /^Untitled( \d+)?\.table\.md$/, "[data-dag-grid-col]"],
+    ];
+    for (const [kind, param, pattern, shown] of KINDS) {
+      let had = new Set();
+      let at = null;
+      await series(
+        [[`create.${kind}`, `the sidebar's New → ${kind}: the click to the file made and open, ready for its name`]],
+        () => [
+          {
+            prepare: async () => {
+              await open("board=Bench");
+              had = new Set(fs.readdirSync(dir));
+              for (let k = 0; ; k++) {
+                try {
+                  if (!(await page.locator("[data-dag-sidebar-new-menu]").isVisible())) {
+                    await page.locator("[data-dag-sidebar-new]").click({ timeout: 1_000 });
+                    await page.locator("[data-dag-sidebar-new-menu]").waitFor({ timeout: 1_000 });
+                  }
+                  const where = page.locator("[data-dag-sidebar-new-where]");
+                  if ((await where.getAttribute("data-dag-sidebar-new-where")) !== "")
+                    await page.locator("[data-dag-sidebar-new-top]").click({ timeout: 1_000 });
+                  at = await centre(`[data-dag-sidebar-new-${kind}]`);
+                  break;
+                } catch (e) {
+                  if (k > 10) throw e;
+                  await page.keyboard.press("Escape");
+                }
+              }
+            },
+            act: async (go) => {
+              go();
+              await page.mouse.click(at.x, at.y);
+            },
+            file: () => fs.readdirSync(dir).some((f) => !had.has(f) && pattern.test(f)),
+            dom: ([param, shown]) =>
+              /^Untitled( \d+)?$/.test(new URLSearchParams(location.search).get(param) ?? "") && !!document.querySelector(shown),
+            domArg: [param, shown],
+          },
+        ],
+      );
+    }
+
+    /* -- a file's name, folder and life --------------------------------------------------------- */
+    const opened = (want) => new URLSearchParams(location.search).get("note") === want;
+    await series(
+      [["file.rename", "a note renamed from its row in the sidebar: Enter to the file moved and the row drawn"]],
+      (i) => {
+        const from = `bench-rename-${i}`;
+        const to = `bench-renamed-${i}`;
+        return [
+          {
+            prepare: async () => {
+              await open(`note=${from}`);
+              await (await rowMenu(from, "rename")).click();
+              await page.locator("[data-dag-sidebar-name]").fill(to);
+            },
+            act: async (go) => {
+              go();
+              await page.locator("[data-dag-sidebar-name]").press("Enter");
+            },
+            file: () => fs.existsSync(file(`${to}.md`)) && !fs.existsSync(file(`${from}.md`)),
+            dom: (to) => !!document.querySelector(`[data-dag-sidebar-file="${to}"]`),
+            domArg: to,
+          },
+        ];
+      },
+    );
+    await series(
+      [
+        [
+          "file.move",
+          "the open note moved into a folder from its row's Move to…: the choice to the file moved and the page on it",
+        ],
+      ],
+      (i) => {
+        const name = `bench-move-${i}`;
+        return [
+          {
+            prepare: async () => {
+              await open(`note=${name}`);
+              await (await rowMenu(name, "move")).click();
+              await page.locator("[data-dag-sidebar-move-to]").waitFor({ timeout: 5_000 });
+            },
+            act: async (go) => {
+              go();
+              await page.locator("[data-dag-sidebar-move-to]").selectOption("inbox");
+            },
+            file: () => fs.existsSync(file(`inbox/${name}.md`)) && !fs.existsSync(file(`${name}.md`)),
+            dom: opened,
+            domArg: `inbox/${name}`,
+          },
+        ];
+      },
+    );
+    await series(
+      [["file.delete", "the open note deleted from its row: the click to the file in the trash and the notice up"]],
+      (i) => {
+        const name = `bench-delete-${i}`;
+        let item = null;
+        return [
+          {
+            prepare: async () => {
+              await open(`note=${name}`);
+              await rowMenu(name, "delete");
+              item = await centre('[data-dag-sidebar-menu-item="delete"]');
+            },
+            act: async (go) => {
+              go();
+              await page.mouse.click(item.x, item.y);
+            },
+            file: () => !fs.existsSync(file(`${name}.md`)),
+            dom: () => !!document.querySelector("[data-dag-trash-notice]"),
+          },
+        ];
+      },
+    );
+  } finally {
+    if (problems.length) record(`${p}.page-errors`, problems.length, "count", problems[0].slice(0, 80));
+    await context.close().catch(() => undefined);
+    await s.stop();
+  }
+}
+
 /* -- the guards ----------------------------------------------------------------------------------- */
 
 async function guard(b) {
@@ -1740,14 +2233,22 @@ async function guard(b) {
 
 /* -- the run -------------------------------------------------------------------------------------- */
 
+/** `--json`: every measurement so far, with the machine. */
+function writeJson(machine, started) {
+  if (!JSON_OUT) return;
+  fs.writeFileSync(JSON_OUT, `${JSON.stringify({ machine, started, args: argv, results }, null, 2)}\n`);
+  console.log(`# wrote ${JSON_OUT}`);
+}
+
 async function main() {
   const m = machine();
   const started = new Date().toISOString();
   console.log(`# AnyDag bench · ${started}`);
   console.log(`# ${m.cpu} · ${m.cores} cores · ${m.memoryGB} GB · ${m.os} · ${m.arch} · Node ${m.node}`);
   console.log(`# temp: ${work}  (${m.disk})`);
+  if (APP !== root) console.log(`# app: ${APP}`);
   if (RELEASE) console.log("# release: the table's ten rows, a 1k-file vault and a 500-item board");
-  const wantBrowser = GUARD || ONLY.has("page") || ONLY.has("board") || ONLY.has("graph-page");
+  const wantBrowser = GUARD || ONLY.has("page") || ONLY.has("board") || ONLY.has("edit") || ONLY.has("graph-page");
   const b = wantBrowser ? await launchBrowser() : null;
   const chromiumVersion = b ? b.browser.version() : null;
   if (b) console.log(`# Chromium ${chromiumVersion}`);
@@ -1766,6 +2267,7 @@ async function main() {
       if (ONLY.has("graph")) await graphGroup(record, { quick: QUICK });
       if (ONLY.has("graph-page")) await graphPageGroup(b);
       if (ONLY.has("board")) await boardGroup(b);
+      if (ONLY.has("edit")) for (const n of SIZES) await editGroup(n, b);
       if (ONLY.has("attach")) await attachGroup();
       if (ONLY.has("vault") || ONLY.has("page")) for (const n of SIZES) await vaultGroup(n, b);
       if (ONLY.has("leak")) await leakGroup();
@@ -1773,10 +2275,9 @@ async function main() {
     }
   } finally {
     if (b) await b.stop();
-  }
-  if (JSON_OUT) {
-    fs.writeFileSync(JSON_OUT, `${JSON.stringify({ machine: m, started, args: argv, results }, null, 2)}\n`);
-    console.log(`# wrote ${JSON_OUT}`);
+    /* Written whether or not every group finished: a long run that stops at its last step keeps
+       what it measured before it (the nightly keeps this file). */
+    writeJson(m, started);
   }
   if (RELEASE) {
     const version = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();

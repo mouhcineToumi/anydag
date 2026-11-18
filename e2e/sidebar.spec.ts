@@ -951,6 +951,19 @@ test("a failure after the list loaded keeps the rows, dimmed", async ({ page }) 
   await expect(fileRow(page, board()).locator("..")).toHaveCSS("opacity", "0.55");
 });
 
+/**
+ * A point in the tree's own space, below its rows: read off the tree, which is always there, rather
+ * than off its last row (#493). Every worker's vault is a folder at the top level, so rows come and go
+ * there while a test runs, and a row read the moment it was taken away has no box. The point is three
+ * rows' height under the tree, so a folder another worker makes in between still leaves it empty.
+ */
+async function belowTheRows(page: Page): Promise<{ x: number; y: number }> {
+  const tree = page.locator('.dag-sidebar__tree > [role="tree"]');
+  await expect(page.locator("[data-dag-sidebar-row]").first()).toBeVisible();
+  const box = (await tree.boundingBox())!;
+  return { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height + 96) };
+}
+
 /*
  * The two checks for the tree's own space run one after the other, never beside each other: both
  * make — or refuse to make — a file **at the top level of the vault**, which every worker's vault is
@@ -973,9 +986,8 @@ test.describe("the tree's empty space", () => {
     await page.setViewportSize({ width: 1200, height: 1500 });
     await fresh(page, `/?board=${board()}`);
 
-    /* Below the last row: the point is read off it, so the check does not guess where the rows end. */
-    const last = (await page.locator("[data-dag-sidebar-row]").last().boundingBox())!;
-    const at = { x: Math.round(last.x + last.width / 2), y: Math.round(last.y + last.height + 24) };
+    /* Below the rows: the point is read off the tree, so the check does not guess where the rows end. */
+    const at = await belowTheRows(page);
     await page.mouse.click(at.x, at.y, { button: "right" });
     const menu = page.locator("[data-dag-sidebar-new-menu]");
     await expect(menu).toBeVisible();
@@ -1026,10 +1038,8 @@ test.describe("the tree's empty space", () => {
         .sort()
         .join();
     const was = topNotes();
-    const last = (await page.locator("[data-dag-sidebar-row]").last().boundingBox())!;
-    await page.mouse.click(Math.round(last.x + last.width / 2), Math.round(last.y + last.height + 24), {
-      button: "right",
-    });
+    const at = await belowTheRows(page);
+    await page.mouse.click(at.x, at.y, { button: "right" });
     const menu = page.locator("[data-dag-sidebar-new-menu]");
     await expect(menu).toBeVisible();
     /* Every entry is offered, carries the lock's style, and a press on one is answered. */

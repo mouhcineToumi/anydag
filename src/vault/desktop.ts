@@ -1,19 +1,26 @@
 /** The app's updates as the shell reports them (`desktop/updates.ts`, copied here because the page
  *  is built apart from the shell). */
 export interface UpdateState {
-  status: "idle" | "checking" | "downloading" | "ready" | "manual" | "error";
+  status: "idle" | "checking" | "downloading" | "ready" | "manual" | "downgrade" | "error";
   /** `false` in a run with nothing packaged to replace. */
   enabled: boolean;
   /** The version running. */
   current: string;
-  /** The newer version, from `downloading` to `manual`. */
+  /** The newer version, from `downloading` to `manual`; the older one a `downgrade` offers. */
   version: string | null;
   percent: number | null;
   /** When the last answered check finished, epoch milliseconds. */
   checkedAt: number | null;
   /** A sentence the person can act on, when `status` is `error`. */
   error: string | null;
+  /** The channel followed (`latest`, `beta`, `nightly`): the person's choice, or the version's own. */
+  channel: string;
+  /** The version's own channel, followed until the person chooses another. */
+  versionChannel: string;
 }
+
+/** The channels a person may choose, in the shell's words (`desktop/updates.ts`). */
+export type UpdateChannel = "latest" | "beta" | "nightly";
 
 /**
  * What the desktop shell (Electron) offers the page, and a browser does not. Every use is optional:
@@ -49,6 +56,8 @@ export interface DesktopBridge {
     onChange(listener: (state: UpdateState) => void): () => void;
     check(): Promise<UpdateState>;
     install(): Promise<void>;
+    setChannel(channel: UpdateChannel): Promise<UpdateState>;
+    downgrade(version: string): Promise<UpdateState>;
   };
   /** The mouse's back and forward buttons where the system delivers them as app commands
    *  (`src/ui/history.ts`). A browser handles the buttons itself, and the page has no listener. */

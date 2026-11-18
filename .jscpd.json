@@ -1,0 +1,24 @@
+{
+  "minLines": 5,
+  "minTokens": 50,
+  "format": ["typescript", "tsx", "javascript", "jsx"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/test/**",
+    "**/e2e/**",
+    "**/fixtures/**",
+    "**/__golden__/**",
+    "boards/**",
+    "themes/**",
+    "icons/data/**",
+    "release/**",
+    "test-results/**",
+    ".dev-home/**",
+    "src/dsl/icon-names.ts",
+    "src/dsl/emoji-names.ts",
+    "src/render/icon-index.ts"
+  ],
+  "reporters": ["console"],
+  "noTips": true
+}

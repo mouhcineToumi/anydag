@@ -148,11 +148,16 @@ test("a quiz written as a file is a card on the Quizzes page, and its questions 
   await card.locator(".dag-quizzes__open").click();
   await expect(page).toHaveURL(new RegExp(`quiz=${encodeURIComponent(name).replace(/%2F/g, "(%2F|/)")}`));
   await expect(page.locator("[data-dag-quiz-question]")).toHaveCount(3);
+  /* Each question one line until it is opened. */
+  await expect(page.locator("[data-dag-quiz-folded]")).toHaveCount(3);
+  await expect(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-row-words]')).toHaveText("What does VACUUM reclaim?");
+  await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-row-meta]')).toHaveText("3 answers · 2 right");
+  await openCard(page, "qvis");
   /* Drawn as what it says — the backticks are code, never characters on the screen. */
-  await expect(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-prompt]')).toHaveText("What does VACUUM reclaim?");
   await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-option-text]').first()).toHaveText("xmin");
-  await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-kind-select]')).toHaveValue("several");
-  await expect(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-kind-select]')).toHaveValue("one");
+  await expect(page.locator('[data-dag-quiz-question="qvis"]')).toHaveAttribute("data-dag-quiz-kind", "several");
+  await expect(page.locator('[data-dag-quiz-question="qvac"]')).toHaveAttribute("data-dag-quiz-kind", "one");
+  await expect(page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-kind-button]')).toHaveText("Several right answers");
   /* No source anywhere on the page. */
   await expect(page.locator("textarea")).toHaveCount(0);
   /* Opening it wrote nothing: the question with no id keeps having none until something writes. */
@@ -165,9 +170,24 @@ async function open(field: Locator): Promise<void> {
   await expect(field.locator('[contenteditable="true"]')).toBeFocused();
 }
 
+/** Open a folded question by its line: the one card open, every other folded (#257). */
+async function openCard(page: Page, id: string): Promise<Locator> {
+  const card = page.locator(`[data-dag-quiz-question="${id}"]`);
+  await card.locator("[data-dag-quiz-row]").click();
+  await expect(card).not.toHaveAttribute("data-dag-quiz-folded");
+  return card;
+}
+
+/** Change a question's kind through the menu on its kind label. */
+async function setKind(card: Locator, kind: "one" | "several" | "written" | "card"): Promise<void> {
+  await card.locator("[data-dag-quiz-kind-button]").click();
+  await card.locator(`[data-dag-quiz-kind-option="${kind}"]`).click();
+}
+
 test("an edit in the form rewrites the question it touched and leaves every other byte", async ({ page }) => {
   const name = write("pg");
   await page.goto(`/?quiz=${name}`);
+  await openCard(page, "qvis");
   const prompt = page.locator('[data-dag-quiz-question="qvis"] [data-dag-quiz-prompt]');
   await open(prompt);
   await page.keyboard.press("ControlOrMeta+A");
@@ -180,7 +200,8 @@ test("an edit in the form rewrites the question it touched and leaves every othe
   /* And the write gave the question that had no id one — minted where it is first needed. */
   expect(after).toMatch(/## Which isolation level is the default\? \{#q[0-9a-z]{6}\}/);
 
-  /* A field opened and left writes nothing, whatever its author's wrapping. */
+  /* A field opened and left writes nothing, whatever its author's wrapping — and nor does a card. */
+  await openCard(page, "qvac");
   await open(page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-why]'));
   await page.locator('[data-dag-quiz-question="qvac"] [data-dag-quiz-prompt]').click();
   await page.locator("[data-dag-quiz-description]").click();
@@ -192,6 +213,7 @@ test("a question built in the form is written as the file's Markdown, none of it
   const name = write("pg");
   await page.goto(`/?quiz=${name}`);
   await page.locator("[data-dag-quiz-add]").click();
+  await page.locator('[data-dag-quiz-add-kind="one"]').click();
   const added = page.locator("[data-dag-quiz-question]").last();
   /* The new card takes the caret, so a person can type straight into it. */
   await expect(added.locator('[data-dag-quiz-prompt] [contenteditable="true"]')).toBeFocused();
@@ -208,7 +230,7 @@ test("a question built in the form is written as the file's Markdown, none of it
   await added.locator("[data-dag-quiz-correct-toggle]").nth(1).check();
   await expect.poll(() => read("pg")).toMatch(/- \[ \] Snapshots\n- \[x\] Row versions\n$/);
   /* Several: both can be ticked, and the ticks say it, so the heading needs no `multi`. */
-  await added.locator("[data-dag-quiz-kind-select]").selectOption("several");
+  await setKind(added, "several");
   await added.locator("[data-dag-quiz-correct-toggle]").nth(0).check();
   await expect
     .poll(() => read("pg"))
@@ -251,8 +273,8 @@ test("a question built in the form is written as the file's Markdown, none of it
 test("a question becomes answered in words, after asking, and back", async ({ page }) => {
   const name = write("pg");
   await page.goto(`/?quiz=${name}`);
-  const card = page.locator('[data-dag-quiz-question="qvac"]');
-  await card.locator("[data-dag-quiz-kind-select]").selectOption("written");
+  const card = await openCard(page, "qvac");
+  await setKind(card, "written");
   /* It has answers with words in them: asked first, and nothing written until it is answered. */
   await expect(card.locator("[data-dag-quiz-drop-answers]")).toBeVisible();
   expect(read("pg")).toBe(QUIZ);
@@ -262,7 +284,7 @@ test("a question becomes answered in words, after asking, and back", async ({ pa
     .toMatch(/## What does VACUUM reclaim\? \{#qvac\}\n\n> Dead tuples stay until VACUUM\n> marks their space reusable\.\n/);
   await expect(card.locator("[data-dag-quiz-option-text]")).toHaveCount(0);
   await expect(card.locator("[data-dag-quiz-why]")).toHaveAttribute("data-dag-quiz-why", "");
-  await card.locator("[data-dag-quiz-kind-select]").selectOption("one");
+  await setKind(card, "one");
   await expect.poll(() => read("pg")).toMatch(/## What does VACUUM reclaim\? \{#qvac\}\n\n- \[x\]\n- \[ \]\n\n> Dead tuples/);
 });
 
@@ -303,44 +325,61 @@ test("a broken quiz says what is wrong in words, on its question, and the form f
     ].join("\n"),
   );
   await page.goto(`/?quiz=${name}`);
-  const status = page.locator(".dag-quiz__status");
-  await expect(status).toContainText("cannot be practiced until fixed");
-  const problems = page.locator("[data-dag-quiz-problem]");
-  await expect(problems).toHaveCount(4);
-  /* Words, never the file: no line numbers and no syntax. */
-  for (const words of await problems.allTextContents()) expect(words).not.toMatch(/line \d|[`#>{}]|\[x\]/);
+  const count = page.locator("[data-dag-quiz-count]");
+  await expect(count).toContainText("4 questions · 4 unfinished");
+  /* Each folded line says what it lacks in a few words. */
+  await expect(page.locator('[data-dag-quiz-question="qa"] [data-dag-quiz-row-meta]')).toHaveText("No right answer marked");
+  /* Words, never the file: no line numbers and no syntax — on the lines, and on each card. */
+  const syntax = /line \d|[`#>{}]|\[x\]/;
+  for (const words of await page.locator("[data-dag-quiz-row-meta]").allTextContents()) expect(words).not.toMatch(syntax);
+  const said = async () => {
+    for (const words of await page.locator("[data-dag-quiz-problem]").allTextContents()) expect(words).not.toMatch(syntax);
+  };
+  /* *Show them* opens the first unfinished question, and each press the next. */
+  const show = page.locator("[data-dag-quiz-show-unfinished]");
 
   /* No answer marked: the ticks are the fix. */
+  await show.click();
   const qa = page.locator('[data-dag-quiz-question="qa"]');
+  await expect(qa).not.toHaveAttribute("data-dag-quiz-folded");
   await expect(qa.locator('[data-dag-quiz-problem="EQ_NO_ANSWER"]')).toBeVisible();
+  await said();
   await qa.locator("[data-dag-quiz-correct-toggle]").nth(1).check();
   await expect(qa.locator("[data-dag-quiz-problem]")).toHaveCount(0);
 
   /* Text the form has no field for: shown, and the card is read-only until it has a place. */
+  await show.click();
   const qb = page.locator('[data-dag-quiz-question="qb"]');
+  await expect(qa).toHaveAttribute("data-dag-quiz-folded", "");
+  await said();
   await expect(qb.locator("[data-dag-quiz-stray]")).toContainText("A stray paragraph.");
   await expect(qb.locator('[data-dag-quiz-prompt] [role="textbox"]')).toHaveAttribute("aria-readonly", "true");
   await qb.locator('[data-dag-quiz-stray-to="why"]').click();
   await expect.poll(() => read("broken")).toContain("> Why.\n>\n> A stray paragraph.\n");
   await expect(qb.locator("[data-dag-quiz-problem]")).toHaveCount(0);
 
+  await show.click();
   const qc = page.locator('[data-dag-quiz-question="qc"]');
+  await said();
   await qc.locator('[data-dag-quiz-fix="clean"]').click();
   await expect.poll(() => read("broken")).toContain("## A setting nobody knows {#qc}\n");
 
   /* The open block swallowed a question; ending it brings the question back. */
   await expect(page.locator('[data-dag-quiz-question="qe"]')).toHaveCount(0);
+  await show.click();
+  await said();
   await page.locator('[data-dag-quiz-fix="close-fence"]').click();
   await expect(page.locator('[data-dag-quiz-question="qe"]')).toBeVisible();
   await expect(page.locator("[data-dag-quiz-problem]")).toHaveCount(0);
   await expect(page.locator("[data-dag-quiz-question]")).toHaveCount(5);
-  await expect(status).toHaveText("");
+  await expect(count).toHaveText("5 questions");
+  await expect(show).toHaveCount(0);
 });
 
 test("an answer and a question are moved by dragging their handles", async ({ page }) => {
   const name = write("pg");
   await page.goto(`/?quiz=${name}`);
-  const card = page.locator('[data-dag-quiz-question="qvis"]');
+  const card = await openCard(page, "qvis");
   const drag = async (from: Locator, to: Locator, below: boolean) => {
     const a = (await from.boundingBox())!;
     const b = (await to.boundingBox())!;
@@ -536,5 +575,5 @@ test("the sidebar's New quiz makes one and opens it, and Quizzes opens the Quizz
   const box = page.locator("[data-dag-toolbar-name]");
   await expect(box).toHaveValue("Untitled");
   await box.press("Escape");
-  await expect(page.locator("[data-dag-quiz-add]")).toContainText("Add the first question");
+  await expect(page.locator("[data-dag-quiz-first]")).toContainText("Add the first question");
 });
