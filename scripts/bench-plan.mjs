@@ -11,8 +11,8 @@
  *
  *   bench    the bench itself: `scripts/bench*.mjs`, the session helper it signs in with, and its
  *            workflow — a change to the ruler is measured with the new ruler on both sides
- *   app      what is built into the page or the server: anything `e2e-plan.mjs` calls `app` or
- *            `pixels`, the sync client in `server/sync/`, and the dependencies (`package.json`, the
+ *   app      what is built into the page or the server: anything `e2e-plan.mjs` calls `app`,
+ *            `pixels` or `chrome`, the sync client in `server/sync/`, and the dependencies (`package.json`, the
  *            lockfile), because a bumped package is a different app
  *   ignore   prose, CI config, unit tests, the browser suite, the desktop shell, the api server
  *            (`api/`, not deployed and not in the local server), and every other script
@@ -28,7 +28,7 @@ export function benchKind(file) {
   if (/^package(-lock)?\.json$/.test(file)) return "app";
   if (/^(scripts|e2e|api)\//.test(file)) return "ignore";
   const kind = kindOf(file);
-  return kind === "app" || kind === "pixels" || kind === "sync" ? "app" : "ignore";
+  return kind === "app" || kind === "pixels" || kind === "chrome" || kind === "sync" ? "app" : "ignore";
 }
 
 /** @param {string[]} files changed paths, relative to the repository root */

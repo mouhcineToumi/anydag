@@ -29,8 +29,9 @@ import {
   type FeedbackKind,
   type FeedbackSent,
 } from "../../protocol/feedback";
+import { feedbackDocs } from "../../protocol/schema";
 import { GitHub, GitHubError } from "../github";
-import { clientAddress, HttpError, isObject, Rate, type Deps, type Vars } from "./http";
+import { clientAddress, HttpError, isObject, parse, Rate, type Deps, type Vars } from "./http";
 
 const PER_MINUTE = 5;
 const ALL_PER_MINUTE = 60;
@@ -78,11 +79,11 @@ function json(raw: FormDataEntryValue | null, what: string): unknown {
   }
 }
 
-function docs(raw: unknown, what: string): FeedbackDoc[] {
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw) || !raw.every((d) => isObject(d) && typeof d.name === "string" && typeof d.text === "string"))
-    throw new HttpError("ES_BAD_REQUEST", `${what} must be a list of {name, text}`);
-  return raw.map((d) => ({ name: d.name as string, text: d.text as string }));
+const BOARDS = feedbackDocs("boards");
+const NOTES = feedbackDocs("notes");
+
+function docs(raw: unknown, schema: typeof BOARDS): FeedbackDoc[] {
+  return raw === undefined ? [] : parse(schema, raw);
 }
 
 function envOf(raw: unknown): FeedbackEnv {
@@ -183,8 +184,8 @@ export function feedbackRoutes(deps: Deps & { fetch?: typeof fetch }): Hono<{ Va
 
     const kind = form.get("kind");
     const text = form.get("text");
-    const boards = docs(json(form.get("boards"), "boards"), "boards");
-    const notes = docs(json(form.get("notes"), "notes"), "notes");
+    const boards = docs(json(form.get("boards"), "boards"), BOARDS);
+    const notes = docs(json(form.get("notes"), "notes"), NOTES);
     const env = envOf(json(form.get("env"), "env"));
     const files: File[] = [];
     for (const f of form.getAll("files")) {

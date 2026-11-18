@@ -26,7 +26,8 @@
  *   --json    also write every measurement, with the machine, to this file — whatever was measured,
  *             when the run stops early too
  *   --app     measure the build in another checkout (its `server/dist/` and `dist/`) rather than
- *             this one's; `scripts/bench-compare.mjs` measures a pull request's base and head so
+ *             this one's; `scripts/bench-compare.mjs` measures a pull request's base and head so,
+ *             both with the head's bench
  *   --keep    leave the temp folder in place and say where it is
  *
  * Needs the built page and server (`npm run build && node server/build.mjs`), except `--only graph`,

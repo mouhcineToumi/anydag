@@ -21,7 +21,8 @@
 #
 # **Who gets it.** The update channel is the version's own word (`nightly`): a build installed from
 # one asks for `nightly*.yml` and follows nightlies, and a stable or beta build never sees a nightly,
-# because a pre-release is not GitHub's "latest" and a beta only follows `beta`. `desktop/main.ts` says how.
+# because a pre-release is not GitHub's "latest" and a beta only follows `beta` — unless its person
+# chose *Nightly* in Settings → About (#525). `desktop/main.ts` says how.
 #
 # `e2e.yml` runs at this workflow's own commit, `develop`'s head — the stamped commit's parent, and the
 # same code but for three version lines.

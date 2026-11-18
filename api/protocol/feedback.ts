@@ -17,19 +17,19 @@
  *   take it verbatim.
  */
 
-const FEEDBACK_KINDS = ["bug", "idea"] as const;
+export const FEEDBACK_KINDS = ["bug", "idea"] as const;
 export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
 
 /** Every file together, and the board and note text with them: the relay buffers one request. */
 export const MAX_FEEDBACK_BYTES = 10 * 1024 * 1024;
 export const MAX_FEEDBACK_FILES = 5;
 /** The person's own words. */
-const MAX_FEEDBACK_TEXT = 20_000;
+export const MAX_FEEDBACK_TEXT = 20_000;
 /** One board or note's text, and how many of them. */
-const MAX_FEEDBACK_DOC = 200_000;
+export const MAX_FEEDBACK_DOC = 200_000;
 const MAX_FEEDBACK_DOCS = 5;
 /** A file's or a document's name. */
-const MAX_FEEDBACK_NAME = 200;
+export const MAX_FEEDBACK_NAME = 200;
 
 /** The kinds of file GitHub draws or links, and nothing that runs. */
 function feedbackMime(type: string): boolean {

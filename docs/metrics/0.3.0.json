@@ -1,0 +1,577 @@
+{
+  "version": "0.3.0",
+  "tag": "v0.3.0",
+  "date": "2026-11-10T11:44:38.000Z",
+  "previous": "0.2.0",
+  "previous_date": "2026-11-08T11:30:51.000Z",
+  "window": {
+    "from": "2026-11-08T11:30:51.000Z",
+    "to": "2026-11-10T11:44:38.000Z"
+  },
+  "rolling": {
+    "from": "2026-11-03T11:44:38.000Z",
+    "to": "2026-11-10T11:44:38.000Z"
+  },
+  "metrics": {
+    "release-frequency": {
+      "value": {
+        "stable": 1,
+        "nightly": 2,
+        "weeks": 0.2870816798941799,
+        "stable_per_week": 3.4833292057110934,
+        "nightly_per_week": 6.966658411422187
+      },
+      "rolling": {
+        "stable": 3,
+        "nightly": 3,
+        "weeks": 1,
+        "stable_per_week": 3,
+        "nightly_per_week": 3
+      },
+      "reason": null,
+      "rollingReason": null
+    },
+    "lead-time-for-changes": {
+      "value": {
+        "median_hours": 18.9,
+        "p90_hours": 43.5,
+        "n": 37,
+        "nightly_median_hours": 34.8,
+        "nightly_p90_hours": 40.7,
+        "nightly_n": 23,
+        "unreleased": 0
+      },
+      "rolling": {
+        "median_hours": 15.8,
+        "p90_hours": 42.1,
+        "n": 58,
+        "nightly_median_hours": 16.4,
+        "nightly_p90_hours": 39.6,
+        "nightly_n": 44,
+        "unreleased": 2
+      },
+      "reason": "no pull request merged in the window reached a stable tag at or before this release",
+      "rollingReason": null
+    },
+    "pr-cycle-time": {
+      "value": {
+        "median_hours": 12.2,
+        "p90_hours": 22.5,
+        "n": 37,
+        "median_lines": 247
+      },
+      "rolling": {
+        "median_hours": 3,
+        "p90_hours": 21.2,
+        "n": 60,
+        "median_lines": 203
+      },
+      "reason": "no pull request merged in the window",
+      "rollingReason": null
+    },
+    "merge-queue-wait": {
+      "value": null,
+      "rolling": null,
+      "reason": "no pull request carried the `queue` label in the window",
+      "rollingReason": "no pull request carried the `queue` label in the window"
+    },
+    "change-failure-rate": {
+      "value": {
+        "rate": 0,
+        "failed": [],
+        "decided": 2,
+        "pending": "0.3.0"
+      },
+      "rolling": {
+        "rate": 0,
+        "failed": [],
+        "decided": 2,
+        "pending": "0.3.0"
+      },
+      "reason": null,
+      "rollingReason": null
+    },
+    "time-to-restore": {
+      "value": null,
+      "rolling": null,
+      "reason": "no `escaped` bug closed in the window has a fix in a stable release",
+      "rollingReason": "no `escaped` bug closed in the window has a fix in a stable release"
+    },
+    "escaped-defect-rate": {
+      "value": {
+        "rate": 0,
+        "escaped": 0,
+        "closed": 13
+      },
+      "rolling": {
+        "rate": 0,
+        "escaped": 0,
+        "closed": 18
+      },
+      "reason": "no bug was closed in the window",
+      "rollingReason": null
+    },
+    "regression-rate": {
+      "value": {
+        "rate": 0.07692307692307693,
+        "regressions": 1,
+        "closed": 13
+      },
+      "rolling": {
+        "rate": 0.05555555555555555,
+        "regressions": 1,
+        "closed": 18
+      },
+      "reason": "no bug was closed in the window",
+      "rollingReason": null
+    },
+    "ci-first-pass-rate": {
+      "value": {
+        "rate": 0.96875,
+        "green": 31,
+        "measured": 32,
+        "skipped": 5
+      },
+      "rolling": {
+        "rate": 0.8666666666666667,
+        "green": 39,
+        "measured": 45,
+        "skipped": 15
+      },
+      "reason": "no pull request merged in the window has a first `CI passed` and `e2e` run",
+      "rollingReason": null
+    },
+    "flaky-tests": {
+      "value": null,
+      "rolling": null,
+      "reason": "the nightly's `flaky:` issue convention began on 2026-11-18T09:50:07.000Z, after this release",
+      "rollingReason": "the nightly's `flaky:` issue convention began on 2026-11-18T09:50:07.000Z, after this release"
+    },
+    "ci-duration": {
+      "value": {
+        "pr_median_minutes": 2.2,
+        "pr_p90_minutes": 3.1,
+        "pr_n": 37,
+        "develop_median_minutes": 1.9,
+        "develop_p90_minutes": 4.4,
+        "develop_n": 18
+      },
+      "rolling": {
+        "pr_median_minutes": 2.2,
+        "pr_p90_minutes": 3.9,
+        "pr_n": 56,
+        "develop_median_minutes": 1.9,
+        "develop_p90_minutes": 3.6,
+        "develop_n": 30
+      },
+      "reason": "no successful `ci.yml` run in the window",
+      "rollingReason": null
+    },
+    "diff-coverage": {
+      "value": null,
+      "rolling": null,
+      "reason": "vitest coverage is not collected on pull requests",
+      "rollingReason": "vitest coverage is not collected on pull requests"
+    },
+    "dependency-health": {
+      "value": {
+        "dependabot": {
+          "critical": 3,
+          "high": 6,
+          "moderate": 12,
+          "low": 2,
+          "total": 23
+        },
+        "audit": null,
+        "audit_reason": "npm audit describes the tree it runs on; a backfilled report has no recorded audit",
+        "major_behind": null,
+        "major_reason": "npm outdated describes the registry it runs against; a backfilled report has no recorded check"
+      },
+      "rolling": {
+        "dependabot": {
+          "critical": 3,
+          "high": 6,
+          "moderate": 12,
+          "low": 2,
+          "total": 23
+        },
+        "audit": null,
+        "audit_reason": "npm audit describes the tree it runs on; a backfilled report has no recorded audit",
+        "major_behind": null,
+        "major_reason": "npm outdated describes the registry it runs against; a backfilled report has no recorded check"
+      },
+      "reason": null,
+      "rollingReason": null
+    },
+    "duplication-and-complexity": {
+      "value": null,
+      "rolling": null,
+      "reason": "depends on #526",
+      "rollingReason": "depends on #526"
+    },
+    "security-backlog": {
+      "value": null,
+      "rolling": null,
+      "reason": "depends on #112",
+      "rollingReason": "depends on #112"
+    },
+    "visual-review": {
+      "value": null,
+      "rolling": null,
+      "reason": "depends on #528",
+      "rollingReason": "depends on #528"
+    },
+    "bench.desktop.startup.1000.cold.ready": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.page.1000.search.first": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.server.rss.rest": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.list.cold": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.list.warm": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.index.cold": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.index.warm": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.search.cold": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.search.warm": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.board.500.ready": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.3.0.json — the bench became a release record at 0.8.0"
+    },
+    "interaction-latency": {
+      "value": null,
+      "rolling": null,
+      "reason": "depends on #527",
+      "rollingReason": "depends on #527"
+    },
+    "throughput": {
+      "value": {
+        "closed": 35,
+        "weeks": 0.2870816798941799,
+        "per_week": 121.91652219988828
+      },
+      "rolling": {
+        "closed": 44,
+        "weeks": 1,
+        "per_week": 44
+      },
+      "reason": null,
+      "rollingReason": null
+    },
+    "work-in-progress": {
+      "value": {
+        "average": 4.333450442615492,
+        "at_tag": 0
+      },
+      "rolling": {
+        "average": 2.3743999782682645,
+        "at_tag": 0
+      },
+      "reason": null,
+      "rollingReason": null
+    },
+    "issue-size": {
+      "value": {
+        "within_day_rate": 0.8461538461538461,
+        "within_day": 22,
+        "measured": 26,
+        "sizes": {
+          "S": 12,
+          "M": 14,
+          "L": 5,
+          "none": 4
+        }
+      },
+      "rolling": {
+        "within_day_rate": 0.8518518518518519,
+        "within_day": 23,
+        "measured": 27,
+        "sizes": {
+          "S": 15,
+          "M": 17,
+          "L": 6,
+          "none": 6
+        }
+      },
+      "reason": "no issue closed in the window carried `status: ready`",
+      "rollingReason": null
+    },
+    "bug-to-feature-ratio": {
+      "value": {
+        "ratio": 1.1818181818181819,
+        "bugs": 13,
+        "features": 11
+      },
+      "rolling": {
+        "ratio": 1.6363636363636365,
+        "bugs": 18,
+        "features": 11
+      },
+      "reason": "no `type: feature` issue was closed in the window",
+      "rollingReason": null
+    },
+    "reopen-rate": {
+      "value": {
+        "rate": 0,
+        "reopened": 0,
+        "closed": 35
+      },
+      "rolling": {
+        "rate": 0,
+        "reopened": 0,
+        "closed": 44
+      },
+      "reason": "no issue was closed in the window",
+      "rollingReason": null
+    },
+    "agent-acceptance": {
+      "value": {
+        "merged": 37,
+        "closed": 37,
+        "rate": 1,
+        "tiers": {
+          "light": {
+            "merged": 4,
+            "closed": 4,
+            "rate": 1
+          },
+          "standard": {
+            "merged": 17,
+            "closed": 17,
+            "rate": 1
+          },
+          "deep": {
+            "merged": 11,
+            "closed": 11,
+            "rate": 1
+          },
+          "untiered": {
+            "merged": 1,
+            "closed": 1,
+            "rate": 1
+          },
+          "unlinked": {
+            "merged": 4,
+            "closed": 4,
+            "rate": 1
+          }
+        }
+      },
+      "rolling": {
+        "merged": 60,
+        "closed": 61,
+        "rate": 0.9836065573770492,
+        "tiers": {
+          "light": {
+            "merged": 4,
+            "closed": 4,
+            "rate": 1
+          },
+          "standard": {
+            "merged": 17,
+            "closed": 17,
+            "rate": 1
+          },
+          "deep": {
+            "merged": 11,
+            "closed": 11,
+            "rate": 1
+          },
+          "untiered": {
+            "merged": 6,
+            "closed": 7,
+            "rate": 0.8571428571428571
+          },
+          "unlinked": {
+            "merged": 22,
+            "closed": 22,
+            "rate": 1
+          }
+        }
+      },
+      "reason": "no pull request was closed in the window",
+      "rollingReason": null
+    },
+    "agent-rework": {
+      "value": {
+        "rate": 0.10810810810810811,
+        "reworked": 4,
+        "n": 37,
+        "by_tier": {
+          "light": {
+            "reworked": 0,
+            "n": 4,
+            "rate": 0
+          },
+          "standard": {
+            "reworked": 3,
+            "n": 17,
+            "rate": 0.17647058823529413
+          },
+          "deep": {
+            "reworked": 0,
+            "n": 11,
+            "rate": 0
+          },
+          "untiered": {
+            "reworked": 0,
+            "n": 1,
+            "rate": 0
+          },
+          "unlinked": {
+            "reworked": 1,
+            "n": 4,
+            "rate": 0.25
+          }
+        },
+        "queue_conflicts": 0
+      },
+      "rolling": {
+        "rate": 0.16393442622950818,
+        "reworked": 10,
+        "n": 61,
+        "by_tier": {
+          "light": {
+            "reworked": 0,
+            "n": 4,
+            "rate": 0
+          },
+          "standard": {
+            "reworked": 3,
+            "n": 17,
+            "rate": 0.17647058823529413
+          },
+          "deep": {
+            "reworked": 0,
+            "n": 11,
+            "rate": 0
+          },
+          "untiered": {
+            "reworked": 0,
+            "n": 7,
+            "rate": 0
+          },
+          "unlinked": {
+            "reworked": 7,
+            "n": 22,
+            "rate": 0.3181818181818182
+          }
+        },
+        "queue_conflicts": 0
+      },
+      "reason": "no pull request was closed in the window",
+      "rollingReason": null
+    },
+    "agent-revert": {
+      "value": {
+        "rate": 0,
+        "reverted": 0,
+        "merged": 37,
+        "by_tier": {
+          "light": {
+            "reverted": 0,
+            "n": 4,
+            "rate": 0
+          },
+          "standard": {
+            "reverted": 0,
+            "n": 17,
+            "rate": 0
+          },
+          "deep": {
+            "reverted": 0,
+            "n": 11,
+            "rate": 0
+          },
+          "untiered": {
+            "reverted": 0,
+            "n": 1,
+            "rate": 0
+          },
+          "unlinked": {
+            "reverted": 0,
+            "n": 4,
+            "rate": 0
+          }
+        }
+      },
+      "rolling": {
+        "rate": 0,
+        "reverted": 0,
+        "merged": 60,
+        "by_tier": {
+          "light": {
+            "reverted": 0,
+            "n": 4,
+            "rate": 0
+          },
+          "standard": {
+            "reverted": 0,
+            "n": 17,
+            "rate": 0
+          },
+          "deep": {
+            "reverted": 0,
+            "n": 11,
+            "rate": 0
+          },
+          "untiered": {
+            "reverted": 0,
+            "n": 6,
+            "rate": 0
+          },
+          "unlinked": {
+            "reverted": 0,
+            "n": 22,
+            "rate": 0
+          }
+        }
+      },
+      "reason": "no pull request was merged in the window",
+      "rollingReason": null
+    }
+  }
+}

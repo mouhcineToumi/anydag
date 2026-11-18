@@ -1,0 +1,247 @@
+{
+  "version": "0.1.0",
+  "tag": "v0.1.0",
+  "date": "2026-11-07T10:18:45.000Z",
+  "previous": null,
+  "previous_date": null,
+  "window": {
+    "from": "2026-10-31T10:18:45.000Z",
+    "to": "2026-11-07T10:18:45.000Z"
+  },
+  "rolling": {
+    "from": "2026-10-31T10:18:45.000Z",
+    "to": "2026-11-07T10:18:45.000Z"
+  },
+  "metrics": {
+    "release-frequency": {
+      "value": {
+        "stable": 1,
+        "nightly": 0,
+        "weeks": 1,
+        "stable_per_week": 1,
+        "nightly_per_week": 0
+      },
+      "rolling": {
+        "stable": 1,
+        "nightly": 0,
+        "weeks": 1,
+        "stable_per_week": 1,
+        "nightly_per_week": 0
+      },
+      "reason": null,
+      "rollingReason": null
+    },
+    "lead-time-for-changes": {
+      "value": null,
+      "rolling": null,
+      "reason": "no pull request merged in the window reached a stable tag at or before this release",
+      "rollingReason": "no pull request merged in the window reached a stable tag at or before this release"
+    },
+    "pr-cycle-time": {
+      "value": null,
+      "rolling": null,
+      "reason": "no pull request merged in the window",
+      "rollingReason": "no pull request merged in the window"
+    },
+    "merge-queue-wait": {
+      "value": null,
+      "rolling": null,
+      "reason": "no pull request carried the `queue` label in the window",
+      "rollingReason": "no pull request carried the `queue` label in the window"
+    },
+    "change-failure-rate": {
+      "value": null,
+      "rolling": null,
+      "reason": "no earlier stable release's fate is decided by this release",
+      "rollingReason": "no earlier stable release's fate is decided by this release"
+    },
+    "time-to-restore": {
+      "value": null,
+      "rolling": null,
+      "reason": "no `escaped` bug closed in the window has a fix in a stable release",
+      "rollingReason": "no `escaped` bug closed in the window has a fix in a stable release"
+    },
+    "escaped-defect-rate": {
+      "value": null,
+      "rolling": null,
+      "reason": "no bug was closed in the window",
+      "rollingReason": "no bug was closed in the window"
+    },
+    "regression-rate": {
+      "value": null,
+      "rolling": null,
+      "reason": "no bug was closed in the window",
+      "rollingReason": "no bug was closed in the window"
+    },
+    "ci-first-pass-rate": {
+      "value": null,
+      "rolling": null,
+      "reason": "no pull request merged in the window has a first `CI passed` and `e2e` run",
+      "rollingReason": "no pull request merged in the window has a first `CI passed` and `e2e` run"
+    },
+    "flaky-tests": {
+      "value": null,
+      "rolling": null,
+      "reason": "the nightly's `flaky:` issue convention began on 2026-11-18T09:50:07.000Z, after this release",
+      "rollingReason": "the nightly's `flaky:` issue convention began on 2026-11-18T09:50:07.000Z, after this release"
+    },
+    "ci-duration": {
+      "value": null,
+      "rolling": null,
+      "reason": "no successful `ci.yml` run in the window",
+      "rollingReason": "no successful `ci.yml` run in the window"
+    },
+    "diff-coverage": {
+      "value": null,
+      "rolling": null,
+      "reason": "vitest coverage is not collected on pull requests",
+      "rollingReason": "vitest coverage is not collected on pull requests"
+    },
+    "dependency-health": {
+      "value": null,
+      "rolling": null,
+      "reason": "Dependabot's first alert on this repository is dated 2026-11-07T19:04:44.000Z, after this release",
+      "rollingReason": "Dependabot's first alert on this repository is dated 2026-11-07T19:04:44.000Z, after this release"
+    },
+    "duplication-and-complexity": {
+      "value": null,
+      "rolling": null,
+      "reason": "depends on #526",
+      "rollingReason": "depends on #526"
+    },
+    "security-backlog": {
+      "value": null,
+      "rolling": null,
+      "reason": "depends on #112",
+      "rollingReason": "depends on #112"
+    },
+    "visual-review": {
+      "value": null,
+      "rolling": null,
+      "reason": "depends on #528",
+      "rollingReason": "depends on #528"
+    },
+    "bench.desktop.startup.1000.cold.ready": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.page.1000.search.first": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.server.rss.rest": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.list.cold": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.list.warm": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.index.cold": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.index.warm": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.search.cold": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.vault.1000.search.warm": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "bench.board.500.ready": {
+      "value": null,
+      "rolling": null,
+      "reason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0",
+      "rollingReason": "no docs/bench/0.1.0.json — the bench became a release record at 0.8.0"
+    },
+    "interaction-latency": {
+      "value": null,
+      "rolling": null,
+      "reason": "depends on #527",
+      "rollingReason": "depends on #527"
+    },
+    "throughput": {
+      "value": {
+        "closed": 0,
+        "weeks": 1,
+        "per_week": 0
+      },
+      "rolling": {
+        "closed": 0,
+        "weeks": 1,
+        "per_week": 0
+      },
+      "reason": null,
+      "rollingReason": null
+    },
+    "work-in-progress": {
+      "value": null,
+      "rolling": null,
+      "reason": "no issue existed at this release",
+      "rollingReason": "no issue existed at this release"
+    },
+    "issue-size": {
+      "value": null,
+      "rolling": null,
+      "reason": "no issue closed in the window carried `status: ready`",
+      "rollingReason": "no issue closed in the window carried `status: ready`"
+    },
+    "bug-to-feature-ratio": {
+      "value": null,
+      "rolling": null,
+      "reason": "no `type: feature` issue was closed in the window",
+      "rollingReason": "no `type: feature` issue was closed in the window"
+    },
+    "reopen-rate": {
+      "value": null,
+      "rolling": null,
+      "reason": "no issue was closed in the window",
+      "rollingReason": "no issue was closed in the window"
+    },
+    "agent-acceptance": {
+      "value": null,
+      "rolling": null,
+      "reason": "no pull request was closed in the window",
+      "rollingReason": "no pull request was closed in the window"
+    },
+    "agent-rework": {
+      "value": null,
+      "rolling": null,
+      "reason": "no pull request was closed in the window",
+      "rollingReason": "no pull request was closed in the window"
+    },
+    "agent-revert": {
+      "value": null,
+      "rolling": null,
+      "reason": "no pull request was merged in the window",
+      "rollingReason": "no pull request was merged in the window"
+    }
+  }
+}
