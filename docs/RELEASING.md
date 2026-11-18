@@ -85,6 +85,11 @@ Pull requests into `develop` must have a Conventional Commit title and close an 
    the machine cannot measure says `n/a`, and `--save` refuses a file that has one. The first release
    to carry the table has no file before it; its table has no previous numbers, and its own run is
    the baseline.
+   **Then audit the chrome**, on the same machine, with the `visual-review` skill:
+   `node scripts/visual-review.mjs --all origin/release/0.2.0` renders every surface in light and dark in the
+   Playwright image, and the agent writes a report of what is inconsistent with `DESIGN.md`
+   (*The visual review* in `docs/architecture/gate-and-releases.md`). It holds nothing back: file
+   what it finds as issues, and fix on the release branch only what should not ship.
 6. **Open the pull request** `release/0.2.0` → `main`, titled `chore(release): 0.2.0`, with the
    required checks green — the desktop app was built on all three systems for it. **Merge it with a
    merge commit** (never squash: `main` keeps the release branch's history).
