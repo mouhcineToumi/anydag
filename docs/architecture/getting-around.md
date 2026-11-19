@@ -103,8 +103,12 @@ the arrows.
 state has the id the listing minted, so an entry whose file was renamed is followed to the name it
 has now. A file that has gone to the trash is skipped — the pop handler checks before it adopts the
 query, so the page never draws a 404 on the way. At the end of a history of dead entries, home is
-what stands. Going back is a read: it writes no file. An editor with unsaved typing is left exactly
-as the sidebar leaves it — its unmount flushes the save the debounce was holding.
+what stands. Going back is a read: it writes no file. **The entry is its address, and only a place
+the address names is written to its state**: a pop moves the address before the handler adopts it,
+so an effect from the page being left that finishes in that window must not mark its own place on
+the entry the pop made current — otherwise Back right after a rename reads the page it left (#500).
+An editor with unsaved typing is left exactly as the sidebar leaves it — its unmount flushes the
+save the debounce was holding.
 
 **With document tabs, the history is still the window's** (*The document tabs*, `sidebar.md`).
 Each entry also names the tab it was made in, and switching tabs is an entry of its own, so Back
