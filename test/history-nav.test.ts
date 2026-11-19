@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BoardTree } from "@/board/useBoard";
-import { resolvePlace, resolvePlaceId, type HistoryPlace } from "@/ui/history";
+import { markHistoryPlace, placeInAddress, resolvePlace, resolvePlaceId, type HistoryPlace } from "@/ui/history";
 
 /**
  * A history entry names a file in the address and carries its id in the state. What a pop does
@@ -81,5 +81,41 @@ describe("asking the server about an id the listing does not name", () => {
   it("throws for an answer about the server rather than the file", async () => {
     vi.stubGlobal("fetch", async () => new Response("down", { status: 503 }));
     await expect(resolvePlaceId("id-plan")).rejects.toThrow("503");
+  });
+});
+
+describe("a place is only written on the entry its address names", () => {
+  it("is the entry's file while the address names it", () => {
+    expect(placeInAddress(place(), "?board=plan&vault=v")).toBe(true);
+    expect(placeInAddress({ kind: "note", name: "notes/idea" }, "?note=notes%2Fidea")).toBe(true);
+  });
+
+  it("is not the page being left, whose address the pop has already replaced", () => {
+    expect(placeInAddress(place(), "?board=other&vault=v")).toBe(false);
+    expect(placeInAddress(place(), "?note=notes%2Fidea")).toBe(false);
+  });
+
+  it("is no file at all only on an address that names none", () => {
+    expect(placeInAddress(null, "?tasks=1&vault=v")).toBe(true);
+    expect(placeInAddress(null, "?board=plan")).toBe(false);
+  });
+
+  it("leaves the entry a pop made current alone when an effect from the page it left fires", () => {
+    /* The entry is A's, as the pop restored it; the effect left over from B fires while the page
+       still holds B. Writing B's place here is what made Back read B and stay on A's old address. */
+    const writes: { dagHistory: { place: HistoryPlace | null } }[] = [];
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("addEventListener", () => undefined);
+    vi.stubGlobal("location", { search: "?board=plan&vault=v" });
+    vi.stubGlobal("history", {
+      state: { dagHistory: { at: 0, top: 1, place: { kind: "board", name: "plan" } } },
+      replaceState: (state: { dagHistory: { place: HistoryPlace | null } }) => void writes.push(state),
+    });
+
+    markHistoryPlace({ kind: "board", name: "renamed", id: "id-plan" });
+    expect(writes).toHaveLength(0);
+
+    markHistoryPlace({ kind: "board", name: "plan", id: "id-plan" });
+    expect(writes.map((state) => state.dagHistory.place)).toEqual([{ kind: "board", name: "plan", id: "id-plan" }]);
   });
 });
