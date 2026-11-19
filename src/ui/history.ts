@@ -160,9 +160,23 @@ export function replaceHistory(url: string, place?: HistoryPlace | null, tab?: s
   history.replaceState(withMark(history.state, markOf(kept, tab ?? mark?.tab)), "", url);
 }
 
+/** Whether `place` is what `search` names: one file key, the same kind and name — or none at all. */
+export function placeInAddress(place: HistoryPlace | null, search: string): boolean {
+  const said = new URLSearchParams(search);
+  const named = FILE_KINDS.filter((kind) => said.get(kind) !== null);
+  return place ? named.length === 1 && named[0] === place.kind && said.get(place.kind) === place.name : named.length === 0;
+}
+
 /** The current entry's place, when the listing did not know the file's id as it was pushed. */
 export function markHistoryPlace(place: HistoryPlace | null): void {
   installHistory();
+  /* **The entry is its address, and a pop moves the address before the page adopts it.** An effect
+     left over from the page being left can ask to mark that page's place at exactly the moment the
+     entry the pop made current becomes current: writing it would put the old page's file on the new
+     entry's state, and the pop handler — which reads the place off that state — would then find the
+     old page and never follow the entry's own file (#500). So only a place the address names is
+     written. */
+  if (typeof location !== "undefined" && !placeInAddress(place, location.search)) return;
   const mark = asMark(history.state);
   if (mark?.at === position.at && mark.top === position.top && samePlace(mark.place, place)) return;
   history.replaceState(withMark(history.state, markOf(place, mark?.tab)), "");

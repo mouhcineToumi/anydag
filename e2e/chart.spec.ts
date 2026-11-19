@@ -375,6 +375,10 @@ notes --> rev
     await page.locator("[data-dag-prop-chart-id]").fill("site");
     await page.locator("[data-dag-prop-chart-id]").blur();
     await expect.poll(read, { timeout: 5_000 }).toContain('series site "Web" 12 30 21');
+    /* The file is the server's answer; the page adopts it and pushes the undo entry one round trip
+       later, so ctrl+Z pressed in that gap finds nothing to undo (the same rule the drag test below
+       spells out). The mark drawn with the new id is the page saying the rename is its own. */
+    await expect(page.locator('[data-dag-item="rev"] [data-dag-node="site"]')).toHaveCount(1);
     expect(read()).not.toContain("series web");
     /* The link that named the series follows it, in the same write; the others stay as written. */
     expect(read()).toContain('notes --> rev.site "why it grew"');
@@ -384,6 +388,11 @@ notes --> rev
     await page.locator(".dag-viewport").focus();
     await page.keyboard.press("Control+z");
     await expect.poll(read, { timeout: 15_000 }).toContain('series web "Web" 12 30 21');
+    /* The redo is the mirror: `history.redo` compares against the version the page *holds*, and the
+       file showing the undo is not yet the page holding it — a key pressed in that gap is refused
+       with no request at all, and the flip-flop above never comes back. The series drawn as `web`
+       is the page saying it holds the undone text. */
+    await expect(page.locator('[data-dag-item="rev"] [data-dag-node="web"]')).toHaveCount(1, { timeout: 10_000 });
     expect(read()).toContain('notes --> rev.web "why it grew"');
     expect(read()).not.toContain("rev.site");
     await page.keyboard.press("Control+Shift+z");
