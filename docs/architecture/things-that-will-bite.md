@@ -505,6 +505,14 @@
   render (#303). Nothing the person waits on belongs behind a `lazy`; a quiz form's rich field is
   the one still there (`notes.md`). A chunk a page asks for as it mounts goes through
   `src/ui/chunk.ts` (`chunk()` and `useChunk`), which is `useBlockEditor` made general.
+- **A cold BlockNote chunk is not a lost focus, and a 5 s assertion cannot tell them apart.** The
+  library click test failed with `element(s) not found` on a loaded machine: `CardText` had mounted
+  and the card was selected, so `write` had opened it — but the editor inside was still fetching and
+  building BlockNote, 4–17 s with six workers and six CPU hogs against an assertion's 5 s default.
+  Read the wrapper (`[data-dag-card-text]`) present and `.bn-editor` absent as the chunk on its way,
+  not as a focus that never came; a longer focus timeout would hide a real loss. The card's editor
+  is handed over without `React.lazy` now (`CardFieldEditor`), and `library.spec.ts` waits for the
+  editor itself before it asks for the caret, as the note's checks do.
 - **A component handed to a BlockNote controller is a component type, so it must be the same one
   on every render.** `SideMenuController` draws its `sideMenu` as `<sideMenu />`, and the note editor
   handed it an arrow written in the render: every re-render of the editor — the page re-renders it

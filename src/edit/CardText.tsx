@@ -1,7 +1,7 @@
-import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 
 import type { BoardItem } from "@/board/types";
-import { FieldEditor } from "@/blocks";
+import { CardFieldEditor } from "@/blocks";
 import type { Point } from "@/canvas/geometry";
 import { ownAssets } from "@/render/assets";
 
@@ -155,22 +155,20 @@ export function CardText({
       onDoubleClick={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
     >
-      <Suspense fallback={null}>
-        <FieldEditor
-          md={start}
-          variant="card"
-          label={`Text of ${item.title ?? item.id}`}
-          scheme={scheme}
-          upload={upload}
-          resolve={(src) => ownAssets(boardName, src)}
-          onChange={(md) => {
-            pending.current = md;
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = setTimeout(flush, DEBOUNCE);
-          }}
-          onDone={done}
-        />
-      </Suspense>
+      <CardFieldEditor
+        md={start}
+        variant="card"
+        label={`Text of ${item.title ?? item.id}`}
+        scheme={scheme}
+        upload={upload}
+        resolve={(src) => ownAssets(boardName, src)}
+        onChange={(md) => {
+          pending.current = md;
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(flush, DEBOUNCE);
+        }}
+        onDone={done}
+      />
     </div>
   );
 }

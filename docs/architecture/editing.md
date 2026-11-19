@@ -720,8 +720,12 @@ a press anywhere outside the box and its menus, closes it.
   `body:<id>` key, so one sitting is one undo, sealed when the box closes.
 - **A card just made is not in the board yet** (one round trip stale): `write` opens on the id, and
   the page mounts the box when the card arrives.
-- **The editor's chunk is fetched the first time a card is opened.** `?snapshot=1` and `?view=1`
-  never reach `CardText`.
+- **The editor's chunk is fetched the first time a card is opened**, and handed over in the render
+  that asks for it once it has come: `CardFieldEditor` keeps the module (as `useBlockEditor` does)
+  instead of `React.lazy`, whose first render suspends even for a loaded module and is then held
+  back by React's 300 ms throttle (#120, #557). A cold chunk under a loaded suite can still outlast
+  a default assertion, so the e2e check waits for the editor before it asks for the caret.
+  `?snapshot=1` and `?view=1` never reach `CardText`.
 
 Names claimed, grepped first: `dag-card-text`, `data-dag-card-text`, `data-dag-write-card`.
 
