@@ -502,13 +502,6 @@
   not as a focus that never came; a longer focus timeout would hide a real loss. The card's editor
   is handed over without `React.lazy` now (`CardFieldEditor`), and `library.spec.ts` waits for the
   editor itself before it asks for the caret, as the note's checks do.
-- **A cold BlockNote chunk outlasts a default `expect`.** `e2e/library.spec.ts`'s click test failed
-  one run in three under load with `element(s) not found`: `CardText` had mounted and the card was
-  selected, but the editor inside it was still fetching and building BlockNote — 4–17 s with six
-  workers and six CPU hogs, against a 5 s default. A card's editor is handed over without
-  `React.lazy` now (`CardFieldEditor`), and the check waits for the editor as the note's own checks
-  do, then for the caret. Diagnose this from the wrapper being there and `.bn-editor` missing, not
-  by lengthening the focus wait: the wrapper and the selection are the proof the click opened it.
 - **A component handed to a BlockNote controller is a component type, so it must be the same one
   on every render.** `SideMenuController` draws its `sideMenu` as `<sideMenu />`, and the note editor
   handed it an arrow written in the render: every re-render of the editor — the page re-renders it
