@@ -70,11 +70,14 @@ const same = (a: Placed | null, b: Placed): boolean =>
 
 export function Rename({
   renaming,
+  shown,
   toBoard,
   onCommit,
   onCancel,
 }: {
   renaming: Renaming;
+  /** The item's body the page is drawing. A rename opened together with a write waits for it. */
+  shown?: string;
   toBoard(clientX: number, clientY: number): Point;
   onCommit(text: string): void;
   onCancel(): void;
@@ -84,6 +87,11 @@ export function Rename({
   /* Escape blurs the box, and blur commits; without this the cancel would be undone by its own
      side effect one tick later. Also stops a commit firing twice when Enter blurs. */
   const done = useRef(false);
+  /* The node the box is meant for may not be drawn yet: a new topic's id is the parser's, and
+     until the page has adopted the body the gesture wrote, that id names whatever the line used to
+     hold. Measuring then puts the box over another card — and the re-measure selects what was
+     typed, so the next key replaces the name (#501). Wait for the body the gesture wrote. */
+  const settled = renaming.body === undefined || renaming.body === shown;
 
   /*
    * After every render, deliberately, rather than when the target changes.
@@ -95,6 +103,7 @@ export function Rename({
    * than inventing a signal from inside a memoised, asynchronously laid out subtree.
    */
   useEffect(() => {
+    if (!settled) return;
     const el = nameElement(renaming);
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -134,7 +143,7 @@ export function Rename({
     }
   }, [at]);
 
-  if (!at) return null;
+  if (!settled || !at) return null;
 
   const commit = () => {
     if (done.current) return;

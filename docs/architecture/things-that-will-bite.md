@@ -186,7 +186,15 @@
   moment the response lands, but between a commit and that response `board` still describes the
   file as it was. An op built in that window can name an item the previous op deleted, and the
   whole patch is refused. A person cannot type that fast; a test can, so the e2e specs wait on
-  the DOM, not only on the file.
+  the DOM, not only on the file. **A body built in that window is worse, because nothing refuses
+  it**: the body is the whole span between the fences, so a gesture that read the adopted text and
+  sent after the write in flight landed replaced that write's text — Tab, a name, Enter, a name
+  lost the name (#501). `useBoard.ahead()` folds the queue onto the adopted text and `bodyOf` in
+  `useEditor` reads that, so a gesture continues the edit the page itself made; `drawnOf` is the
+  drawn text, for ids that came out of the DOM (a double-click, a drag). And an inline rename waits
+  for the body its gesture wrote (`Renaming.body`) before it measures: a node id is positional, so
+  until the page has adopted that body the id can name a different node — the box would open over
+  the wrong card, and the re-measure would select the name when the right card arrived.
 - **A rule about what exists reads the newest board, not the render that wrote the rule.** The
   selection is pruned to the ids the file has, and that effect read `board` from its own render.
   React may flush an older render's passive effect *after* a write's answer has adopted the newer

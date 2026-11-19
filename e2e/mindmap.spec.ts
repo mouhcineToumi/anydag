@@ -125,6 +125,37 @@ test("Tab, a name, Enter, a name: an outline written without leaving the keyboar
   await expect(page.locator("[data-dag-error]")).toHaveCount(0);
 });
 
+test("a slow answer costs no name: the next key builds on the topic the one before it wrote", async ({ page }) => {
+  /* The server writes the file at once and the page hears about it six hundred milliseconds
+     later, which is a loaded machine or a slow disk. `useBoard` adopts the answer when it lands, so
+     in between the page still holds the text from before the write — and a key pressed in that
+     window that built its body from that text wrote the name it had just made away (#501). */
+  await page.route("**/__board/patch*", async (route) => {
+    try {
+      const answer = await route.fetch();
+      await new Promise((done) => setTimeout(done, 600));
+      await route.fulfill({ response: answer });
+    } catch {
+      /* A test can end with a write still in flight; the page closes and takes the response with
+         it, and a route that outlives its page has nothing to answer. */
+    }
+  });
+  await open(page);
+  await pick(page, "m3");
+
+  await page.keyboard.press("Tab");
+  await nameIt(page, "Erd2");
+  await expect.poll(bodyOf, { timeout: 5_000 }).toContain("    Arch\n      Erd2\n    Erd");
+
+  await page.keyboard.press("Enter");
+  await nameIt(page, "Fox");
+  await expect.poll(bodyOf, { timeout: 5_000 }).toContain("      Erd2\n      Fox\n    Erd");
+
+  await page.keyboard.press("Shift+Tab");
+  await expect.poll(bodyOf, { timeout: 5_000 }).toContain("    Arch\n      Erd2\n    Fox\n    Erd");
+  await expect(page.locator("[data-dag-error]")).toHaveCount(0);
+});
+
 test("Alt+arrows move the picked topic among its siblings, and the pick goes with it", async ({ page }) => {
   await open(page);
   await pick(page, "m7");
