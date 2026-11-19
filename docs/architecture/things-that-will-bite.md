@@ -196,7 +196,8 @@
   **And a read may itself be behind**: a feed refetch's answer is adopted only while the page
   still holds the version it asked on, and asks again otherwise, so an answer read before the
   page's own write cannot put the board back a version. `e2e/group.spec.ts` has a check that holds
-  an older read until the duplicate has landed and fails without either half.
+  an older read until the duplicate has landed and fails without the change; the repeat run of the
+  duplicate check is what covers the late-effect half.
 - **A gesture that repeats is a gesture that must paint and write separately, and the nudge was
   the one that did not.** `nudge` called `move`, which paints *and* commits — so a held arrow key
   was one `POST /patch` per OS key repeat, about thirty a second — roughly thirty times the
