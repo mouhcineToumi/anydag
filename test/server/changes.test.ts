@@ -171,7 +171,11 @@ describe("the change feed", () => {
     write(env.root, "sentinel.board.md", BOARD);
     await doc(f, "sentinel");
     await sleep(300);
-    expect(f.events.filter((e) => e.type === "doc").map((e) => (e as Doc).name)).toEqual(["sentinel"]);
+    /* A change, not a write: one write can be reported by two watcher batches — a create and the
+       change that completes it, 50 ms apart under load — and #405's cover can say a file twice too.
+       A listener takes the echo by its sha1; what this test is about is that nothing the vault keeps
+       for itself is said at all, so it asserts the names, not how many times one was said (#491). */
+    expect(new Set(f.events.filter((e) => e.type === "doc").map((e) => (e as Doc).name))).toEqual(new Set(["sentinel"]));
   });
 
   it("many listeners share the one watcher, and the last to leave stops it", async () => {
