@@ -89,8 +89,13 @@ test("a click adds the component in the middle of the view and opens it for edit
   await expect
     .poll(read, { timeout: 5_000 })
     .toMatch(/```md \{#md-[a-z0-9]{4} w=520 x=-?\d+ y=-?\d+\}\n\| name \| type \| note \|/);
-  /* Its text opens on the card, as rich text: a table to type into, not its Markdown (#145). */
-  await expect(page.locator('[data-dag-card-text] [contenteditable="true"]')).toBeFocused();
+  /* Its text opens on the card, as rich text: a table to type into, not its Markdown (#145).
+     The editor is a chunk fetched the first time a card is opened, and a loaded suite can take
+     longer than an assertion's 5 s to fetch and build BlockNote — the note's own checks wait
+     15–30 s for it. Wait for the editor itself, then for the caret it takes when it is ready. */
+  const text = page.locator('[data-dag-card-text] [contenteditable="true"]');
+  await expect(text).toBeAttached({ timeout: 20_000 });
+  await expect(text).toBeFocused();
   await expect(page.locator("[data-dag-card-text] table")).toHaveCount(1);
   await expect(page.locator("[data-dag-inspector]")).toHaveCount(0);
   await expect(page.locator('[data-dag-type="md"] table')).toHaveCount(1);
