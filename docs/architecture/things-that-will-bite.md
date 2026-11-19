@@ -187,6 +187,16 @@
   file as it was. An op built in that window can name an item the previous op deleted, and the
   whole patch is refused. A person cannot type that fast; a test can, so the e2e specs wait on
   the DOM, not only on the file.
+- **A rule about what exists reads the newest board, not the render that wrote the rule.** The
+  selection is pruned to the ids the file has, and that effect read `board` from its own render.
+  React may flush an older render's passive effect *after* a write's answer has adopted the newer
+  text and a duplicate has selected its copies: the effect then filtered the new selection by the
+  old ids and dropped them for good — the copies were in the file, and nothing was selected (#461).
+  `BoardHandle.latest()` is the board the newest **adoption** parsed, and the prune reads that.
+  **And a read may itself be behind**: a feed refetch's answer is adopted only while the page
+  still holds the version it asked on, and asks again otherwise, so an answer read before the
+  page's own write cannot put the board back a version. `e2e/group.spec.ts` has a check that holds
+  an older read until the duplicate has landed and fails without either half.
 - **A gesture that repeats is a gesture that must paint and write separately, and the nudge was
   the one that did not.** `nudge` called `move`, which paints *and* commits — so a held arrow key
   was one `POST /patch` per OS key repeat, about thirty a second — roughly thirty times the
