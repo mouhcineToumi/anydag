@@ -98,7 +98,9 @@ Nine things are load-bearing:
   field unnamed. Mantine is **8**, not 9: 9 wants React 19.
   Beside it is `FieldEditor`, the one-field editor a quiz's form mounts (see *Quizzes*): the note's
   bridge, paste (`src/blocks/paste.ts`), references and equations, on a schema cut to
-  `FIELD_BLOCKS`. It is still a `React.lazy`, so the throttle above applies to it.
+  `FIELD_BLOCKS`. A quiz's field is still a `React.lazy`, so the throttle above applies to it; a
+  board card's text uses `CardFieldEditor`, which keeps the module and hands it over in the render
+  that asks for it once it has come (#120, #557).
 - **The colours are the theme's.** `className="dag-blocks"` lands on the editor and on every menu
   BlockNote portals out of it, and `src/styles/blocks.css` sets each `--bn-*` from a `--dag-*` there,
   two classes and an attribute deep so it wins whichever stylesheet loads last. It is chrome in
