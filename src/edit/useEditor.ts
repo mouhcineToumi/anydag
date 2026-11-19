@@ -271,6 +271,16 @@ export interface Renaming {
   seg: number;
   /** What is in the box when it opens — read once, from the file, at the moment of the gesture. */
   text: string;
+  /**
+   * The item's body the gesture wrote, when the box opens on a node that write is still making.
+   *
+   * A node's id is the parser's, and the parser's ids move when a line is inserted above one — so
+   * until this page has adopted the body it wrote, that id names a *different* topic in the
+   * drawing. A box opened on it types into the wrong card, and when the right one arrives the
+   * re-measure selects what was typed and the next key replaces the name. The box waits for this
+   * body instead: the page's own answer that the id now means the node the gesture made (#501).
+   */
+  body?: string;
 }
 
 /**
@@ -295,6 +305,39 @@ function nameableUnder(el: Element | null): { id: string; what: Renaming["what"]
   if (d.dagLane) return { id: d.dagLane, what: "lane" };
   if (d.dagEdge) return { id: d.dagEdge, what: "edge" };
   return null;
+}
+
+/**
+ * A pointer gesture's four listeners, and the Escape that abandons it.
+ *
+ * `move` paints the gesture, `up` finishes it, and `cancel` is the gesture's own flag, set before
+ * `up` so the release Escape ends writes nothing. Escape is captured, because the board's own key
+ * handler would take the key first and read it as "let go of the pick", which is the one thing
+ * that must not happen mid-gesture.
+ */
+function armGesture(move: (e: PointerEvent) => void, up: () => void, cancel: () => void): void {
+  const off = () => {
+    removeEventListener("pointermove", move);
+    removeEventListener("pointerup", release);
+    removeEventListener("pointercancel", release);
+    removeEventListener("keydown", onKey, true);
+  };
+  const onKey = (ev: KeyboardEvent) => {
+    if (ev.key !== "Escape") return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    cancel();
+    off();
+    up();
+  };
+  const release = () => {
+    off();
+    up();
+  };
+  addEventListener("pointermove", move);
+  addEventListener("pointerup", release);
+  addEventListener("pointercancel", release);
+  addEventListener("keydown", onKey, true);
 }
 
 /** The methods `Item` calls. One object, never recreated. */
@@ -989,13 +1032,50 @@ export function useEditor({
    * back — the id was not declared here, the line is not an edge — writes nothing at all rather
    * than making an empty history entry.
    */
-  const bodyOf = useCallback((id: string): BoardItem | undefined => boardRef.current?.items.find((x) => x.id === id), []);
+  const bodyOf = useCallback((id: string): BoardItem | undefined => {
+    /* A key pressed before the answer to the write before it lands must build on the text that
+       write will leave: a body rendered from the adopted one writes the name just typed away
+       (#501, and *The board is one round trip stale after a write*). The drawing can also be a
+       render behind an answer the queue has already emptied, which is the same bug a render
+       later — so this asks the queue, never the drawn board. */
+    return (handleRef.current.ahead()?.board ?? boardRef.current)?.items.find((x) => x.id === id);
+  }, []);
+
+  /* The item as the page draws it — the text the ids in the DOM were parsed from. A gesture aimed
+     at the drawing (a double-click, a drag) reads this one; an edit that continues what the page
+     wrote reads `bodyOf`, which is one write ahead of it. */
+  const drawnOf = useCallback((id: string): BoardItem | undefined => boardRef.current?.items.find((x) => x.id === id), []);
 
   const writeBody = useCallback(
     (it: BoardItem, next: string) => {
       if (next !== it.body) void commit([{ id: it.id, body: next }], `body:${it.id}`);
     },
     [commit],
+  );
+
+  /**
+   * The text a whole-file writer must start from: what the queued writes will leave.
+   *
+   * `current()` is the version the page has *adopted*, which a write's round trip is behind; a
+   * body or a whole file rendered from it and sent after the write in flight lands writes that
+   * edit away (#501). `ahead()` folds the queue onto it and answers the text the page will have
+   * once the answers are in.
+   */
+  const textNow = useCallback(
+    (): string | null => handleRef.current.ahead()?.text ?? handleRef.current.current()?.text ?? null,
+    [],
+  );
+
+  /** A whole version of the file: the write, its undo entry, and the sentence when it is refused. */
+  const putText = useCallback(
+    async (text: string): Promise<string | null> => {
+      const w = await handleRef.current.put(text);
+      if (!w) return "the file changed underneath. Try again";
+      history.push(w.before, w.after);
+      setTick((t) => t + 1);
+      return null;
+    },
+    [history],
   );
 
   const removePickedNode = useCallback(() => {
@@ -1049,7 +1129,8 @@ export function useEditor({
    */
   const startRename = useCallback(
     (item: string, at: { id: string; what: Renaming["what"]; seg?: number }): boolean => {
-      const it = bodyOf(item);
+      /* The id came from the drawing, so the body it is resolved in is the one that drew it. */
+      const it = drawnOf(item);
       if (!it || !isDiagramType(it.type)) return false;
       /* A sequence's fragment and note: a branch's condition, a note's words — read off the line. */
       const seq = it.type === "sequence" && at.what === "group" ? seqIdOf(at.id) : null;
@@ -1104,7 +1185,7 @@ export function useEditor({
       setRenaming({ item, id: at.id, what: at.what, seg: 0, text: found });
       return true;
     },
-    [bodyOf, pickNode],
+    [drawnOf, pickNode],
   );
 
   const cancelRename = useCallback(() => setRenaming(null), []);
@@ -1177,8 +1258,8 @@ export function useEditor({
          `feature2` is a name nobody chose. */
       setRenaming(
         done.branch
-          ? { item, id: done.branch, what: "lane", seg: 0, text: done.branch }
-          : { item, id: done.id, what: "node", seg: 0, text: "New commit" },
+          ? { item, id: done.branch, what: "lane", seg: 0, text: done.branch, body: done.body }
+          : { item, id: done.id, what: "node", seg: 0, text: "New commit", body: done.body },
       );
       writeBody(it, done.body);
     },
@@ -1831,10 +1912,6 @@ export function useEditor({
 
       let cancelled = false;
       const onUp = () => {
-        removeEventListener("pointermove", onMove);
-        removeEventListener("pointerup", onUp);
-        removeEventListener("pointercancel", onUp);
-        removeEventListener("keydown", onKey, true);
         mark(null);
         delete document.documentElement.dataset.dagNodeDrag;
         card.style.transform = "";
@@ -1864,20 +1941,9 @@ export function useEditor({
         if (next !== null) writeShifted(cur, next.body, next.shift);
       };
 
-      /* Escape abandons it, captured — the board's own key handler would take the key first and
-         read it as "let go of the pick", which is the one thing that must not happen mid-gesture. */
-      const onKey = (ev: KeyboardEvent) => {
-        if (ev.key !== "Escape") return;
-        ev.preventDefault();
-        ev.stopPropagation();
+      armGesture(onMove, onUp, () => {
         cancelled = true;
-        onUp();
-      };
-
-      addEventListener("pointermove", onMove);
-      addEventListener("pointerup", onUp);
-      addEventListener("pointercancel", onUp);
-      addEventListener("keydown", onKey, true);
+      });
       return true;
     },
     [bodyOf, laidOutIn, writeShifted],
@@ -1959,10 +2025,6 @@ export function useEditor({
       };
 
       const onUp = () => {
-        removeEventListener("pointermove", onMove);
-        removeEventListener("pointerup", onUp);
-        removeEventListener("pointercancel", onUp);
-        removeEventListener("keydown", onKey, true);
         mark(null);
         ghost?.remove();
         delete document.documentElement.dataset.dagDrawing;
@@ -1975,21 +2037,12 @@ export function useEditor({
         writeBody(cur, made.body);
         setPickedNode(null);
         setPickedEdge({ item: id, id: made.id, line: made.line, seg: 0 });
-        setRenaming({ item: id, id: made.id, what: "edge", seg: 0, text: "message" });
+        setRenaming({ item: id, id: made.id, what: "edge", seg: 0, text: "message", body: made.body });
       };
 
-      const onKey = (ev: KeyboardEvent) => {
-        if (ev.key !== "Escape") return;
-        ev.preventDefault();
-        ev.stopPropagation();
+      armGesture(onMove, onUp, () => {
         cancelled = true;
-        onUp();
-      };
-
-      addEventListener("pointermove", onMove);
-      addEventListener("pointerup", onUp);
-      addEventListener("pointercancel", onUp);
-      addEventListener("keydown", onKey, true);
+      });
       return true;
     },
     [bodyOf, laidOutIn, writeBody],
@@ -2055,7 +2108,7 @@ export function useEditor({
       if (!made) return;
       setPickedNode({ item: it.id, node: made.id });
       /* A start or an end state draws no text, so there is nothing to name. */
-      if (!pseudo) setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "" });
+      if (!pseudo) setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "", body: made.body });
       writeShifted(it, made.body, shift);
     },
     [bodyOf, laidOutIn, writeShifted],
@@ -2102,8 +2155,9 @@ export function useEditor({
     }
 
     setPickedNode({ item: it.id, node: id });
-    setRenaming({ item: it.id, id, what: plan.word === "lane" ? "lane" : "group", seg: 0, text: "" });
-    writeShifted(it, wrapStatement(body, plan.line, opts), shift);
+    const text = wrapStatement(body, plan.line, opts);
+    setRenaming({ item: it.id, id, what: plan.word === "lane" ? "lane" : "group", seg: 0, text: "", body: text });
+    writeShifted(it, text, shift);
   }, [bodyOf, laidOutIn, writeShifted]);
 
   /**
@@ -2122,7 +2176,7 @@ export function useEditor({
       const made = growTopic(it.body, p.node, as);
       if (!made) return false;
       setPickedNode({ item: it.id, node: made.id });
-      setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "" });
+      setRenaming({ item: it.id, id: made.id, what: "node", seg: 0, text: "", body: made.body });
       writeBody(it, made.body);
       return true;
     },
@@ -2196,19 +2250,17 @@ export function useEditor({
       if (want === id) return null;
       if (want === "") return "an item needs a name";
       if (lockedRef.current) return (refuseLocked(), "read only: unlock to rename it");
-      const cur = handleRef.current.current();
-      if (!cur) return "the board has not loaded yet";
-      const done = renameItemId(cur.text, id, want);
+      const text = textNow();
+      if (!text) return "the board has not loaded yet";
+      const done = renameItemId(text, id, want);
       if (!done.ok) return done.error;
-      const w = await handleRef.current.put(done.text);
-      if (!w) return "the file changed underneath. Try again";
-      history.push(w.before, w.after);
-      setTick((t) => t + 1);
+      const refused = await putText(done.text);
+      if (refused) return refused;
       setSelected(new Set([want]));
       setEditing((prev) => (prev === id ? want : prev));
       return null;
     },
-    [history],
+    [putText, textNow],
   );
 
   /**
@@ -2222,19 +2274,15 @@ export function useEditor({
   const renameNode = useCallback(
     async (id: string, from: string, to: string, body: string): Promise<string | null> => {
       if (lockedRef.current) return (refuseLocked(), "read only: unlock to rename it");
-      const cur = handleRef.current.current();
-      if (!cur) return "the board has not loaded yet";
-      const patched = applyPatch(cur.text, [{ id, body }]);
+      const text = textNow();
+      if (!text) return "the board has not loaded yet";
+      const patched = applyPatch(text, [{ id, body }]);
       if (!patched.ok) return patched.error;
       const done = renameNodeLinks(patched.text, id, from, to);
       if (!done.ok) return done.error;
-      const w = await handleRef.current.put(done.text);
-      if (!w) return "the file changed underneath. Try again";
-      history.push(w.before, w.after);
-      setTick((t) => t + 1);
-      return null;
+      return putText(done.text);
     },
-    [history],
+    [putText, textNow],
   );
 
   const place = useCallback(
@@ -3801,7 +3849,7 @@ export function useEditor({
       if (kind === "md") {
         /* The id is the store's, not the file's, so the copy in transit carries it as an envelope
            and an import of it keeps every reference to this board working. */
-        const text = handleRef.current.current()?.text ?? "";
+        const text = textNow() ?? "";
         const id = handleRef.current.docId;
         /* With the pictures and the attachments it names beside it, in a zip, when it names any
  — the text alone otherwise, as it always was. */
@@ -4087,17 +4135,13 @@ export function useEditor({
       if (fix.kind === "attr") {
         return (await commit([{ id: fix.item, attrs: { [fix.key]: null } }])) ? null : "the file changed underneath. Try again";
       }
-      const cur = handleRef.current.current();
-      if (!cur) return "the board has not loaded yet";
-      const done = fix.kind === "frontmatter" ? repairFrontmatter(cur.text) : retypeFence(cur.text, fix.line, fix.from, fix.to);
+      const text = textNow();
+      if (!text) return "the board has not loaded yet";
+      const done = fix.kind === "frontmatter" ? repairFrontmatter(text) : retypeFence(text, fix.line, fix.from, fix.to);
       if (!done.ok) return done.error;
-      const w = await handleRef.current.put(done.text);
-      if (!w) return "the file changed underneath. Try again";
-      history.push(w.before, w.after);
-      setTick((t) => t + 1);
-      return null;
+      return putText(done.text);
     },
-    [commit, history],
+    [commit, putText, textNow],
   );
 
   /* ---- keys and the clipboard ---- */

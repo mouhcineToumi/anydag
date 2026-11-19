@@ -3508,6 +3508,7 @@ function BoardApp({
             <Rename
               key={`${editor.renaming.item}:${editor.renaming.id}`}
               renaming={editor.renaming}
+              shown={board?.items.find((it) => it.id === editor.renaming?.item)?.body}
               toBoard={editor.toBoard}
               onCommit={editor.commitRename}
               onCancel={editor.cancelRename}

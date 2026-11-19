@@ -6,10 +6,10 @@ import { concerns, onBoard, onBoards, onFile, onNote, onQuiz, onTable, type Boar
 import { GUESSED, guessed, shown, tick } from "./guess";
 import { refresher } from "./refresher";
 import type { SavedComponent } from "./library/saved";
+import { applyPatch, type PatchOp } from "./patch";
 import { parseBoard } from "./parseBoard";
 import { openDoc } from "./prefetch";
 import { FILE_LIST, readPref, writeLocal } from "../settings/prefs";
-import type { PatchOp } from "./patch";
 import { rebaseOps } from "./rebase";
 import type { Board } from "./types";
 import type { EventChange, NoteEvent } from "../note/event";
@@ -88,6 +88,19 @@ export interface BoardHandle {
   /** The version this client currently holds, or `null` before the first load. */
   current(): Version | null;
   /**
+   * The text as it will be once every write already queued has landed, and the board it parses to
+   * — or `null` before the first load.
+   *
+   * **A write's answer is a round trip away, and the file is written the moment the write is
+   * sent.** `current()` answers with the version the page has *adopted*; between a write and its
+   * answer that is the text from before it, and even when the answer has arrived the drawing can
+   * be one render behind it. A gesture that builds a body from the old text and sends it after the
+   * earlier write lands writes the earlier edit away — Tab, a name, Enter, a name lost the name
+   * (#501). Replaying the queue is what lets the second gesture build on the first, the way it
+   * does when the answer is quick.
+   */
+  ahead(): { text: string; board: Board } | null;
+  /**
    * The board's permanent id — the store's, never the file's — or `null` before the
    * first load. What an export carries and what a reference to this board names.
    */
@@ -104,6 +117,10 @@ export function useBoard(name: string | null): BoardHandle {
   /* A ref, not state: a write must read the version as of the moment it is called, and a value
      captured in a render closure is one HMR push out of date exactly when it matters. */
   const held = useRef<Version | null>(null);
+  /* The writes the queue has not answered yet, each as the text it will leave (`ahead`), and the
+     one parse of that text. A queue belongs to the board it was written for. */
+  const pending = useRef<((text: string) => string | null)[]>([]);
+  const aheadCache = useRef<{ name: string; text: string; board: Board } | null>(null);
   /* The name this hook is on now, for a write's answer that arrives after it moved to another. */
   const named = useRef(name);
   named.current = name;
@@ -130,6 +147,10 @@ export function useBoard(name: string | null): BoardHandle {
 
   useEffect(() => {
     setDocId(null);
+    /* A queued write, and the parse of the text it will leave, belong to the board they were
+       written for. */
+    pending.current = [];
+    aheadCache.current = null;
     if (!name) {
       setBoard(null);
       setProblem(null);
@@ -324,11 +345,31 @@ export function useBoard(name: string | null): BoardHandle {
    * and the later ones would be refused. Queued, each write leaves with the version the one before
    * it produced, so a 409 is always another writer — and an overlapping pair was two round trips
    * anyway, the second one a retry.
+   *
+   * The queue is also read forwards: each entry knows the text it will leave, so a gesture made
+   * while an answer is out builds on it (`ahead`) rather than on the version the page last adopted.
    */
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const write = useCallback(
-    (route: string, payload: object, rebase?: (from: string, onto: string) => object | null): Promise<Write | null> => {
-      const run = queue.current.then(() => send(route, payload, rebase));
+    (
+      route: string,
+      payload: object,
+      rebase: ((from: string, onto: string) => object | null) | undefined,
+      step: (text: string) => string | null,
+    ): Promise<Write | null> => {
+      pending.current = [...pending.current, step];
+      const settle = () => {
+        pending.current = pending.current.filter((s) => s !== step);
+      };
+      const run = queue.current.then(async () => {
+        try {
+          return await send(route, payload, rebase);
+        } finally {
+          /* A write that threw was not written either; the queue must not go on calling its text
+             the page's. */
+          settle();
+        }
+      });
       queue.current = run.catch(() => undefined);
       return run;
     },
@@ -338,15 +379,46 @@ export function useBoard(name: string | null): BoardHandle {
   const patch = useCallback(
     (ops: PatchOp[]): Promise<Write | null> => {
       if (ops.length === 0) return Promise.resolve(null);
-      return write("patch", { ops }, (from, onto) => {
-        const rebased = rebaseOps(ops, from, onto);
-        return rebased.ok ? { ops: rebased.ops } : null;
-      });
+      /* What the write will actually send: the ops as written, then the rebased ones after a 409 —
+         so `ahead` describes the file the queue will leave, not the one the page first asked for. */
+      let live = ops;
+      return write(
+        "patch",
+        { ops },
+        (from, onto) => {
+          const rebased = rebaseOps(ops, from, onto);
+          if (!rebased.ok) return null;
+          live = rebased.ops;
+          return { ops: rebased.ops };
+        },
+        (text) => {
+          const next = applyPatch(text, live);
+          return next.ok ? next.text : null;
+        },
+      );
     },
     [write],
   );
-  const put = useCallback((text: string): Promise<Write | null> => write("put", { text }), [write]);
+  const put = useCallback((text: string): Promise<Write | null> => write("put", { text }, undefined, () => text), [write]);
   const current = useCallback(() => held.current, []);
+  /* The queue's own reading, parsed once per text: a key handler asks for it before anything
+     else, and the same text is asked for again by the gesture that key begins. */
+  const ahead = useCallback((): { text: string; board: Board } | null => {
+    if (!held.current || !name) return null;
+    let text = held.current.text;
+    for (const step of pending.current) {
+      const next = step(text);
+      /* A step that will not apply is a write the server will refuse; the last text one of them
+         did apply is the honest answer rather than a guess at what it meant. */
+      if (next === null) break;
+      text = next;
+    }
+    const kept = aheadCache.current;
+    if (kept?.name === name && kept.text === text) return kept;
+    const board = parseBoard(name, text);
+    aheadCache.current = { name, text, board };
+    return aheadCache.current;
+  }, [name]);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
   return {
@@ -357,6 +429,7 @@ export function useBoard(name: string | null): BoardHandle {
     patch,
     put,
     current,
+    ahead,
     docId,
   };
 }
