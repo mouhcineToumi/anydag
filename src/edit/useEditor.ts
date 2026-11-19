@@ -815,10 +815,16 @@ export function useEditor({
   }, [laidOut]);
 
   /* A selection can only name items that exist. Claude deleting one, or the board changing under
-     the page, must not leave a ghost in the set. */
+     the page, must not leave a ghost in the set.
+     **Judged against the newest board the page holds, not the one this render drew.** A render can
+     be one round trip behind: the write that created an item adopts its board and resolves, the
+     caller selects the new ids, and only then does the passive effect of the older board run. Read
+     from `board`, it filtered the new selection by the old ids and dropped the copies a duplicate
+     had just selected — for good, since the selection never recovers (#461). */
   useEffect(() => {
-    if (!board) return;
-    const ids = new Set(board.items.filter((it) => it.page === page && !it.hidden).map((it) => it.id));
+    const now = handleRef.current.latest();
+    if (!now) return;
+    const ids = new Set(now.items.filter((it) => it.page === page && !it.hidden).map((it) => it.id));
     setSelected((prev) => {
       const next = new Set([...prev].filter((id) => ids.has(id)));
       return next.size === prev.size ? prev : next;

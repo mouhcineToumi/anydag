@@ -144,6 +144,67 @@ test("a group moves, duplicates and deletes as one", async ({ page }) => {
   expect(read()).toContain("group=g1");
 });
 
+test("an older feed read landing after a duplicate does not take its selection", async ({ page }) => {
+  fs.writeFileSync(
+    file,
+    BOARD.replace("{#a x=0 y=0 w=200}", "{#a x=0 y=0 w=200 group=g1}").replace(
+      "{#b x=280 y=0 w=200}",
+      "{#b x=280 y=0 w=200 group=g1}",
+    ),
+  );
+  await open(page);
+  await clickItem(page, "a");
+  await expect(page.locator("[data-dag-selected]")).toHaveCount(2);
+
+  /* Another writer moves C and retitles the board, and the feed's answer — read *now*, before the
+     duplicate — is held until the duplicate has written and selected its copies. The page is
+     therefore one version behind when ctrl+D lands, takes the 409, rebases and writes the copies;
+     releasing the old answer then offers it a three-item board as the newest thing it has seen.
+     Adopting it took the board back a version and the selection rule dropped the copies (#461). */
+  let arm = false;
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  let readAnswer!: () => void;
+  const answerRead = new Promise<void>((r) => (readAnswer = r));
+  const answered: Promise<void>[] = [];
+  await page.route("**/__board/get*", async (route) => {
+    if (!arm) return route.continue();
+    arm = false;
+    /* The read happens now, against the three-item file. */
+    const response = await route.fetch();
+    readAnswer();
+    const answer = held.then(() => route.fulfill({ response }));
+    answered.push(answer);
+    await answer;
+  });
+  arm = true;
+  fs.writeFileSync(
+    file,
+    read().replace("title: Group me", "title: Group me · moved").replace("{#c x=0 y=200 w=200}", "{#c x=400 y=200 w=200}"),
+  );
+  await answerRead;
+
+  await page.keyboard.press("Control+d");
+  await expect.poll(() => (read().match(/```md/g) ?? []).length, { timeout: 5_000 }).toBe(5);
+  await expect(page.locator('[data-dag-item="a"][data-dag-selected]')).toHaveCount(0);
+  await expect(page.locator("[data-dag-selected]")).toHaveCount(2);
+
+  release();
+  await Promise.all(answered);
+  /* Let the released answer reach the page. What it does with it is the check: the board must not
+     go back to three items, and the two copies must still be the selection. */
+  await page.waitForTimeout(300);
+  await expect(page.locator("[data-dag-selected]")).toHaveCount(2);
+  const ids = await selectedIds(page);
+  expect(ids).not.toContain("a");
+  expect(ids).not.toContain("b");
+
+  /* They are the copies, so Delete leaves the originals and their group. */
+  await page.keyboard.press("Delete");
+  await expect.poll(() => (read().match(/```md/g) ?? []).length, { timeout: 5_000 }).toBe(3);
+  expect(read()).toContain("group=g1");
+});
+
 test("the dashed box and its handles follow the members mid-drag", async ({ page }) => {
   fs.writeFileSync(
     file,
